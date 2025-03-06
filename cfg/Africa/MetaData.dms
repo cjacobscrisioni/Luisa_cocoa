@@ -1,0 +1,426 @@
+Container MetaData: Using = "Classifications;"
+{
+	parameter<uint32> StartYear           := 2015;
+	parameter<uint32> EndYear             := 2050;
+	parameter<uint32> SupplyChange        := 0;
+	parameter<float32>YoungForestMatures  := 25f;
+	
+	unit<uint32> Periods := range(uint32, 0, ((EndYear - StartYear) / 5)+1)
+	{
+		attribute<uint32> Year               := 2015 + (id(.)*5);
+		attribute<string> sYear              := 'y'+string(Year);
+		attribute<string> spopProjYear       := sYear;
+		attribute<uint32> Duration           := makedefined(Year - Year[sub_or_null(id(.), 1)], 0);
+		attribute<float32>Duration_densmodel := float32(Duration) / 5f;
+	}
+	
+	unit<uint32> AllFactors: 		expr = "union_unit(StaticFactors, DynamicFactors, RegionalFactors)" 
+	{
+		attribute<string> Name: 	expr = "union_data(., StaticFactors/uniName, DynamicFactors/Name, RegionalFactors/Name)";
+		attribute<string> Ref: 		expr = "union_data(., 'Context/StaticGridFactors/' + StaticFactors/Name + '[domain/grid_rel]', 'Context/DynamicGridFactors/'+ DynamicFactors/Name +'[domain/grid_rel]', 'Context/RegionalFactors/'+RegionalFactors/Name)";
+		attribute<bool>	  Grid:		expr = "union_data(., const(true,StaticFactors,bool),const(true,DynamicFactors,bool),const(false,RegionalFactors,bool))";
+		attribute<string> Label: 	expr = "Name", DialogType = "LabelText";
+		attribute<bool>	  Regional:	expr = "union_data(., const(False,StaticFactors,bool),const(False,DynamicFactors,bool),const(True,RegionalFactors,bool))";
+	}
+	
+	unit<uint8> DemandModels := ModelType
+	{
+		attribute<string> RefYearMaxDef := 
+			switch(
+				case(id(.) = ModelType/ParamConstants/Crops          ,'MakeDefined(roundUp(Conversion/Arable_Conv), 0i)[uint32]')
+				,case(id(.) = ModelType/ParamConstants/PermanentCrops ,'MakeDefined(roundUp(Conversion/Permanent_Conv), 0i)[uint32]') 		// * 10 because faostat numbers are in 1000ha (10sq km)
+				//,case(id(.) = ModelType/ParamConstants/PermanentCrops ,'max_elem(int32(roundUp(Conversion/Permanent_Conv)) - MaxDemands/Cocoa[int32], 1i)[uint32]') 		// * 10 because faostat numbers are in 1000ha (10sq km)
+				//,case(id(.) = ModelType/ParamConstants/MatureForest ,'max_elem(int32(roundUp(Sum(float32(domain_1k/ModelType_landuse_incidence/'+ ModelType/Name +'[grid_rel]), RegionMaps/riverbasins) / 100f)) - MaxDemands/Cocoa[int32], 1i)[uint32]') 		// * 10 because faostat numbers are in 1000ha (10sq km)
+				,case(id(.) = ModelType/ParamConstants/Cocoa          ,'roundUp(Sum(float32(domain_1k/ModelType_landuse_incidence/cocoa[grid_rel]), RegionMaps/riverbasins) / (100f * 100f))[uint32]') 
+				,case(id(.) = ModelType/ParamConstants/Shrubs         ,'pcount(RegionMaps/Countries)[uint32]')									// potentially fill entire country with shrubs for when claims are too small
+				,case(id(.) = ModelType/ParamConstants/Herbaceous     ,'pcount(RegionMaps/Countries)[uint32]')									// potentially fill entire country with herbaceous for when claims are too small
+				,case(id(.) = ModelType/ParamConstants/NoData         ,'const(0, Boundaries/UnitSets16/Countries, uint32)')
+				,case(id(.) = ModelType/ParamConstants/Urban          ,'1 + roundUp(Sum(float32(domain_1k/ModelType_landuse_incidence/'+ ModelType/Name +'[grid_rel]), RegionMaps/Countries) / 100f)[uint32]') 
+				,'roundUp(Sum(float32(domain_1k/ModelType_landuse_incidence/'+ ModelType/Name +'[grid_rel]), RegionMaps/'+BaseMapClaimDef+') / 100f)[uint32]'
+			);
+		attribute<string> RefYearMinDef := 
+			switch(
+				 case(id(.) = ModelType/ParamConstants/Crops          ,'max_elem(int32(MaxDemands/Crops-1) - MaxDemands/Cocoa[int32], 0i)[uint32]')
+				,case(id(.) = ModelType/ParamConstants/PermanentCrops ,'max_elem(int32(MaxDemands/PermanentCrops-1) - MaxDemands/Cocoa[int32], 0i)[uint32]')
+				,case(id(.) = ModelType/ParamConstants/Cocoa          ,'MakeDefined(MaxDemands/Cocoa - 1, 0)')
+				,case(id(.) = ModelType/ParamConstants/Urban          ,'MakeDefined(MaxDemands/Urban - 1, 0)')
+				,'const(0, Boundaries/UnitSets16/'+BaseMapClaimDef+', uint32)'
+			);
+	}
+	
+	unit<uint32> DynamicFactors: expr = "proto_DynamicFactors";
+	//combine(proto_DynamicFactors, Interaction_Variables)"
+	//{
+//		attribute<string> Name: 	expr = "MakeDefined(Interaction_Variables/Name[Nr_2] + '_x_', '')+proto_DynamicFactors/Name[Nr_1]";
+//		attribute<string> Ref:		expr = "MakeDefined(Interaction_Variables/Def[Nr_2] + ' * ', '')+proto_DynamicFactors/Ref[Nr_1]";
+//		attribute<string> OrgRef:	expr = "MakeDefined(Interaction_Variables/Def[Nr_2] + ' * ', '')+proto_DynamicFactors/OrgRef[Nr_1]";
+//	}
+	
+	unit<uint32> proto_DynamicFactors: expr = "union_unit(DynamicFactors_Def, DynamicFactors_Def, Classifications/ModelType, Classifications/ModelType)" 
+	{
+		attribute<string> Name:= union_data(., 
+									DynamicFactors_Def/Name
+									, 'w_' + DynamicFactors_Def/Name
+									, 'is_'+ModelType/Name
+									, 'w_is_'+ModelType/Name
+								);
+		attribute<string> Ref := union_data(., 
+									DynamicFactors_Def/Ref
+									, 'potential('+ DynamicFactors_Def/Name + ', MetaData/Wij/Default/Matr)'
+									, 'float32(BaseMapPreparation/domain_1k/ModelType_landuse_incidence/'+ModelType/Name+' >= ModelParameters/Landuse_Threshold[float32])'
+									, 'potential(is_'+ ModelType/Name + ', MetaData/Wij/Default/Matr)'
+								);
+		attribute<string> OrgRef := id(.) < #DynamicFactors_Def ? DynamicFactors_Def/OrgRef[id(.)[DynamicFactors_Def]] : Ref;
+	}
+	
+	unit<uint32> DynamicFactors_Def : NrOfRows = 28 
+	{
+		parameter<uint32> NrAttributes := 3;
+		
+		attribute<string> Name := inTable/Elements[((id(.)*NrAttributes)+0)[inTable]];
+		attribute<string> Ref: 		expr = "inTable/Elements[((id(.)*NrAttributes)+1)[inTable]]";
+		attribute<string> OrgRef:	expr = "MakeDefined(inTable/Elements[((id(.)*NrAttributes)+2)[inTable]], Ref)";
+		
+		unit<uint32> inTable: expr = "range(uint32, 0, #DynamicFactors_Def * NrAttributes)" {
+			attribute<string> Elements: [
+			//name, 				//dynamic def							//first def
+			'PotAccess',				'Access/PotAccess/Ag',					'Access/PotAccess_2015/Ag',
+			'TransportPerformance',		'Access/PotAccess/TPg',					'Access/PotAccess_2015/TPg',
+			'NetworkEfficiency',		'Access/PotAccess/NEg',					'Access/PotAccess_2015/NEg',
+			'relPotAccess',				'PotAccess / mean(PotAccess)', 			Null,
+			'rpa',						'relPotAccess',				 			Null,
+			'rpa2',						'(relPotAccess^2f)', 					Null,
+			's_hat',					'PopulationPressure/Population_Pressure[AllocDomain/BaseGrid]', 'const(0,domain_1k,float32)',
+			'Qi',						'PrevState/Qi',							'float32(LoadSpatialData/GHS_Pop_15/inFile/ReadData)',
+			'ln_Q',						'log(Qi + 0.01f)',						Null,
+			'populated',				'float32(Qi > 0f)',						Null,
+			'inv_TT_Cities',			'StaticGridFactors/inv_TT_Cities',		Null,
+			'Constant',					'StaticGridFactors/Constant',			Null,
+			'Cocoa_protect',			'float32(RunSettings/ForestProtection && (PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/MatureForest || StaticGridFactors/protected_areas > 0f))', Null,
+			'Si',						'PrevState/Si',							Null,
+			'Age_Si',					'PrevState/Age_Si',						Null,
+			'Age_LU',					'PrevState/Age_LU',						Null,
+			'ln_Age_LU',				'log(Age_LU + 0.01f)',					Null,
+			'Urban',					'float32(ResultingState/LandUse = ModelType/ParamConstants/Urban)',	'float32(PrevState/LandUse = ModelType/ParamConstants/Urban)',
+			'bu_val',					'float32(PrevState/Landuse = ModelType/ParamConstants/Urban) * RegionalFactors/mGHS_in_urban[ModelClaimRasters/Urban]',	'float32(PrevState/Landuse = ModelType/ParamConstants/Urban) * RegionalFactors/mGHS_in_urban[uint16(0)]',
+			'cuml_bu_val',				'max_elem(bu_val - StaticGridFactors/GHS_BU_90, float32(0))', Null,
+			'dBU_prevState_km120',		'potential(PrevState/NewUrban, MetaData/Wij/KM120_summation/Matr)',		'StaticGridFactors/GHS_dBU_90_14_km120',
+			'dBU_cuml_km120',			'potential(cuml_bu_val, MetaData/Wij/KM120_summation/Matr)',		'StaticGridFactors/GHS_dBU_90_14_km120',
+			'rel_dBU_prevState_km120',	'(dBU_prevState_km120 / mean(dBU_prevState_km120))', null, //* float32(0.1)
+			'rel_dBU_cuml_km120',		'dBU_cuml_km120 / mean(dBU_cuml_km120)', null,
+			'rel_GHS_dBU_90_14_km120',	'StaticGridFactors/rel_GHS_dBU_90_14_km120 * float32(1) / (float32(PeriodId) + float32(1))', Null,
+			'rel_GHS_dBU_90_00_km120',	'StaticGridFactors/rel_GHS_dBU_90_00_km120', Null,
+			'cocoa_neighb_prob',		'proximity(is_cocoa, MetaData/Wij/cocoa_summation/Matr)', null,
+			'ln_clim_suit_x_neighb_prob','StaticGridFactors/log_cocoa_climate_suit * cocoa_neighb_prob', null
+			];
+		}
+	}
+	unit<uint32> Interaction_Variables: NrOfRows = 7 
+	{
+		parameter<uint32> NrAttributes := 2;
+		
+		attribute<string> Name := inTable/Elements[((id(.)*NrAttributes)+0)[inTable]];
+		attribute<string> Def  := 'float32(' + inTable/Elements[((id(.)*NrAttributes)+1)[inTable]] + ')';
+				
+		unit<uint32> inTable := range(uint32, 0, #Interaction_Variables * NrAttributes)
+		{
+			attribute<string> Elements: [
+				//name,				//boolean def
+				Null,				Null,
+				'cQi_0',			'Qi < float32(50)',
+				'cQi_1',			'Qi >= float32(50) && Qi <  float32(500)',
+				'cQi_2',			'Qi >= float32(500) && Qi <  float32(2500)',
+				'cQi_3',			'Qi >= float32(2500) && Qi <  float32(5000)',
+				'cQi_4',			'Qi >= float32(5000) && Qi <  float32(15000)',
+				'cQi_5',			'Qi >= float32(15000)'
+			];
+		}
+	}
+
+	unit<uint32> StaticFactors := union_unit(Proto_StaticFactors, Proto_StaticFactors, Classifications/ModelType, Classifications/ModelType) 
+	{
+		attribute<string> Name    := union_data(., Proto_StaticFactors/Name, 'w_' + Proto_StaticFactors/Name, 'inc_'+ModelType/Name, 'w_inc_'+ModelType/Name);
+		attribute<string> uniName := !IsNull(rlookup(Name, DynamicFactors/Name)) ? 'static_' + Name : Name;
+		attribute<string> Ref     := union_data(.,
+										Proto_StaticFactors/Prefix+'('+Proto_StaticFactors/Ref+')'
+										,'potential('+Proto_StaticFactors/Name+'
+										, MetaData/Wij/Default/Matr)'
+										,'float32(domain_1k/ModelType_landuse_incidence/'+ModelType/Name+')'
+										,'potential(inc_'+ModelType/Name+', MetaData/Wij/Default/Matr)'
+									);
+	}
+	
+	unit<uint32> Proto_StaticFactors: NrOfRows = 57 
+	{
+		parameter<uint32> NrAttributes := 3;
+		
+		unit<uint32> inTable := range(uint32, 0, #Proto_StaticFactors * NrAttributes)
+		{
+			attribute<string> Elements: 
+			//Name, Reference, Valuetype
+			[
+			'Constant',					'const(1.0, domain_1k, float32)', 'float32',
+			'TravelTimeToCities',		'LoadSpatialData/TravelTimeToCities/inFile/ReadData > int32(-1) ? LoadSpatialData/TravelTimeToCities/inFile/ReadData : int32(0 / 0)', 'float32',
+			'inv_TT_Cities',			'MakeDefined(float32(1) / (TravelTimeToCities + float32(1)))', 'float32',
+			'EcoRegionId',				'LoadSpatialData/Ecoregions/RasterIds', 'float32',
+			'GHS_BU_90', 				'float32(max_elem(LoadSpatialData/GHS_BU_90/inFile/ReadData, int32(0)))', 'float32',
+			'GHS_BU_00', 				'float32(max_elem(LoadSpatialData/GHS_BU_00/inFile/ReadData, int32(0)))', 'float32',
+			'GHS_BU_14', 				'float32(max_elem(LoadSpatialData/GHS_BU_14/inFile/ReadData, int32(0)))', 'float32',
+			'GHS_dBU_90_14_km120',		'potential(max_elem(GHS_BU_14 - GHS_BU_90, float32(0)), MetaData/Wij/KM120_summation/Matr)', 'float32',
+			'GHS_dBU_90_00_km120',		'potential(max_elem(GHS_BU_14 - GHS_BU_00, float32(0)), MetaData/Wij/KM120_summation/Matr)', 'float32',
+			'rel_GHS_dBU_90_14_km120',	'GHS_dBU_90_14_km120 / max(GHS_dBU_90_14_km120)', 'float32',
+			'rel_GHS_dBU_90_00_km120',	'GHS_dBU_90_00_km120 / max(GHS_dBU_90_00_km120)', 'float32',
+			'GHS_Pop_90', 				'float32(max_elem(LoadSpatialData/GHS_Pop_90/inFile/ReadData, int32(0)))', 'float32',
+			'GHS_Pop_00', 				'float32(max_elem(LoadSpatialData/GHS_Pop_00/inFile/ReadData, int32(0)))', 'float32',
+			'GHS_Pop_15', 				'float32(max_elem(LoadSpatialData/GHS_Pop_15/inFile/ReadData, int32(0)))', 'float32',
+			'GHS_fPop_15', 				'MakeDefined(GHS_Pop_15 / GHS_Pop_00, 0f)', 'float32',
+			'GHS_dPop_90_15', 			'GHS_Pop_15 - GHS_Pop_90', 'float32',
+			'GHS_dPop_00_15', 			'GHS_Pop_15 - GHS_Pop_00', 'float32',
+			'GHS_dBU_90_15', 			'GHS_BU_14 - GHS_BU_90', 'float32',
+			'GHS_dBU_00_15', 			'GHS_BU_00 - GHS_BU_90', 'float32',
+			'GHS_BU_90_km120',			'potential(GHS_BU_90 ,MetaData/Wij/KM120_summation/Matr)', 'float32',
+			'rel_GHS_BU_90_km120',		'GHS_BU_90_km120 / mean(GHS_BU_90_km120)', 'float32',
+			'MapSpam_total',			'makeDefined((float32(LoadSpatialData/MapSpam/inFile/TotalCrops) / float32(pcount(LoadSpatialData/MapSpam/RasterIds)))[LoadSpatialData/MapSpam/RasterIds], float32(0))', 'float32',
+			'MapSpam_arable',			'makeDefined((float32(LoadSpatialData/MapSpam/inFile/ArableCrop) / float32(pcount(LoadSpatialData/MapSpam/RasterIds)))[LoadSpatialData/MapSpam/RasterIds], float32(0))', 'float32',
+			'MapSpam_permacrops',		'makeDefined((float32(LoadSpatialData/MapSpam/inFile/PermaCrops) / float32(pcount(LoadSpatialData/MapSpam/RasterIds)))[LoadSpatialData/MapSpam/RasterIds], float32(0))', 'float32',
+			'MapSpam_itpd_weight',		'MakeDefined(potential(const(1,LoadSpatialData/MapSpam/inFile,float32)[LoadSpatialData/MapSpam/CentroidsRaster], Metadata/Wij/MapSpamInterpolation/attr), float32(1))', 'float32',
+			'MapSpam_total_itpd',		'MakeDefined(IsDefined(LoadSpatialData/MapSpam/CentroidsRaster) ? float32(LoadSpatialData/MapSpam/inFile/TotalCrops[LoadSpatialData/MapSpam/CentroidsRaster]) : potential(float32(LoadSpatialData/MapSpam/inFile/TotalCrops[LoadSpatialData/MapSpam/CentroidsRaster]), Metadata/Wij/MapSpamInterpolation/attr) / MapSpam_itpd_weight, float32(0))', 'float32',
+			'MapSpam_arable_itpd',		'MakeDefined(IsDefined(LoadSpatialData/MapSpam/CentroidsRaster) ? float32(LoadSpatialData/MapSpam/inFile/ArableCrop[LoadSpatialData/MapSpam/CentroidsRaster]) : potential(float32(LoadSpatialData/MapSpam/inFile/ArableCrop[LoadSpatialData/MapSpam/CentroidsRaster]), Metadata/Wij/MapSpamInterpolation/attr) / MapSpam_itpd_weight, float32(0))', 'float32',
+			'MapSpam_permacrops_itpd',	'MakeDefined(IsDefined(LoadSpatialData/MapSpam/CentroidsRaster) ? float32(LoadSpatialData/MapSpam/inFile/PermaCrops[LoadSpatialData/MapSpam/CentroidsRaster]) : potential(float32(LoadSpatialData/MapSpam/inFile/PermaCrops[LoadSpatialData/MapSpam/CentroidsRaster]), Metadata/Wij/MapSpamInterpolation/attr) / MapSpam_itpd_weight, float32(0))', 'float32',
+			'w_forest_x_inc_nodata',	'w_inc_matureforest * inc_NoData', 'float32',
+			'w_shrubs_x_inc_nodata',	'w_inc_shrubs * inc_NoData', 'float32',
+			'w_herbaceous_x_inc_nodata','w_inc_herbaceous * inc_NoData', 'float32',
+			'w_bare_x_inc_nodata',		'w_inc_bare * inc_NoData', 'float32',
+			'potaccess_1990',			'Access/PotAccess_1990/Ag', 'float32',
+			'potaccess_2000',			'Access/PotAccess_2000/Ag', 'float32',
+			'potaccess_2015',			'Access/PotAccess_2015/Ag', 'float32',
+			'relpotaccess_1990',		'potaccess_1990 / mean(potaccess_1990)', 'float32',
+			'relpotaccess_2000',		'potaccess_2000 / mean(potaccess_2000)', 'float32',
+			'relpotaccess_2015',		'potaccess_2015 / mean(potaccess_2015)', 'float32',
+			'w_start_bu',				'GHS_BU_14', 							 'float32', 
+			'crops_fract', 				'float32(LoadSpatialData/crops_fract_meansd/inFile/ReadData)',		'float32',	 
+			'grass_fract', 				'float32(LoadSpatialData/grass_fract_meansd/inFile/ReadData)',		'float32',	
+			'shrubs_fract', 			'float32(LoadSpatialData/shrubs_fract_meansd/inFile/ReadData)',		'float32', 
+			'tri', 						'float32(LoadSpatialData/ruggedness/inFile/ReadData)',				'float32', 
+			'rough', 					'float32(LoadSpatialData/roughness/inFile/ReadData)',		'float32', 
+			'slope', 					'float32(LoadSpatialData/slope/inFile/ReadData)',			'float32', 
+			'reltri', 					'float32(LoadSpatialData/ruggedness/inFile/ReadData) / float32(max(LoadSpatialData/ruggedness/inFile/ReadData))'		,'float32', 
+			'relrough', 				'float32(LoadSpatialData/roughness/inFile/ReadData) / float32(max(LoadSpatialData/roughness/inFile/ReadData))'			,'float32', 
+			'relslope', 				'float32(LoadSpatialData/slope/inFile/ReadData) / float32(max(LoadSpatialData/slope/inFile/ReadData))'					,'float32',
+			'ghsl_uc',	 				'float32(IsDefined(LoadSpatialData/ghsl_uc/RasterIds))'																	,'float32',
+			'wgt_urb_in_ghsl_uc',		'MakeDefined(1f / (sum(inc_Urban, LoadSpatialData/ghsl_uc/RasterIds)[LoadSpatialData/ghsl_uc/RasterIds] / 100f), 0f)'	,'float32',
+			'wgt_ghsl_in_ghsl_uc',		'MakeDefined(1f / (sum(GHS_BU_14, LoadSpatialData/ghsl_uc/RasterIds)[LoadSpatialData/ghsl_uc/RasterIds]), 0f)'			,'float32',
+			'cocoa_climate_suit'		,'float32(LoadSpatialData/cocoa_climate_suit_2016/inFile/ReadData)'														,'float32',
+			'log_cocoa_climate_suit'	,'log(max_elem(float32(LoadSpatialData/cocoa_climate_suit_2016/inFile/ReadData), 0.01f))' 								,'float32',
+			'perc_cocoa_climate_suit'	,'min_elem(cocoa_climate_suit / rth_element(cocoa_climate_suit, 0.95f), 1f)' 																		,'float32',
+//			'sqr_cocoa_climate_suit'	,'sqr(float32(LoadSpatialData/cocoa_climate_suit_2016/inFile/ReadData))'			 									,'float32',
+			'log_slope'					,'log(max_elem(float32(LoadSpatialData/slope/inFile/ReadData), 0.01f))'														,'float32', 
+			'log_rough'					,'log(max_elem(float32(LoadSpatialData/roughness/inFile/ReadData), 0.01f))'													,'float32',
+			'protected_areas'			,'float32(IsDefined(LoadSpatialData/CIV_Ghana_ProtAreas_IUCN/RasterIds))'													,'float32'
+			];
+		}
+		attribute<string> Name   := inTable/Elements[((id(.)*NrAttributes)+0)[inTable]];
+		attribute<string> Ref    := inTable/Elements[((id(.)*NrAttributes)+1)[inTable]];
+		attribute<string> Prefix := inTable/Elements[((id(.)*NrAttributes)+2)[inTable]];
+	}
+	unit<uint32> RegionalFactors: NrOfRows = 11 
+	{
+		parameter<uint32> NrAttributes := 4;
+		
+		unit<uint32> inTable := range(uint32, 0, #RegionalFactors * NrAttributes)
+		{
+			attribute<string> Elements:
+			[
+			//Name. Reference, aggregation, zonal
+
+			'MapSpam_total', 		'float32(StaticGridFactors/MapSpam_total)', 				'sum',	'Riverbasins',
+			'MapSpam_arable',		'float32(StaticGridFactors/MapSpam_arable)', 			'sum',	'Riverbasins',
+			'MapSpam_permacrops',	'float32(StaticGridFactors/MapSpam_permacrops)',			'sum',	'Riverbasins',
+			'nAgric',				'float32(uint32(LandUse = Classifications/ActiveModelTypes/ParamConstants/Crops || LandUse = Classifications/ActiveModelTypes/ParamConstants/PermanentCrops))', 'sum', 'Ghana_Regions_old10',
+			'nCocoa',				'float32(uint32(LandUse = Classifications/ActiveModelTypes/ParamConstants/Cocoa))', 'sum', 'Ghana_Regions_old10',
+			'ln_fdPop',				null,											null,	null,
+			'ln_fdGDPperCap',		null,											null,	null,
+			'ln_prevdens',			null,											null,	null,
+			'CountryConstant',		'float32(StaticGridFactors/Constant)',					'mean',	'Countries',
+			'mGHS_in_urban',		'float32(LandUse = Classifications/ActiveModelTypes/ParamConstants/Urban ? StaticGridFactors/GHS_BU_14 : float32(0 / 0))', 'mean', 'Countries',
+			'p99_GHS_fPop_15',		'StaticGridFactors/GHS_fPop_15, 0.99f', 					'rth_element', 'Countries'
+			];
+		}
+		attribute<string> Name     := inTable/Elements[((id(.)* NrAttributes)+0)[inTable]];
+		attribute<string> Ref      := inTable/Elements[((id(.)* NrAttributes)+1)[inTable]];
+		attribute<string> Aggr     := inTable/Elements[((id(.)* NrAttributes)+2)[inTable]];
+		attribute<string> Boundary := inTable/Elements[((id(.)* NrAttributes)+3)[inTable]];
+	}
+	unit<uint32> CsvDataToLoad := union_unit(proto_CsvDataToLoad, ModelType, ActiveModelTypes, ActiveModelTypes, ActiveModelTypes)
+	{
+		attribute<string> Name        := union_data(., proto_CsvDataToLoad/Name, 		'BaseMap_suitdef_'+ModelType/Name, 						'Model_suitdef_'+ActiveModelTypes/Name 					,'TransitionCost_modifier_'+ActiveModelTypes/Name, 'Revenue_modifier_'+ActiveModelTypes/Name);
+		attribute<string> Path        := union_data(., proto_CsvDataToLoad/Path, 		'%ProjDir%/parameters/BaseMapAlloc/'+ModelType/Name,	'%ProjDir%/parameters/ModelAlloc/'+ActiveModelTypes/Name,'%ProjDir%/parameters/TransitionCostModifiers/'+ActiveModelTypes/Name, '%ProjDir%/parameters/RevenueModifiers/'+ActiveModelTypes/Name);
+		attribute<string> TargetUnit  := union_data(., proto_CsvDataToLoad/TargetUnit, 	const('Geometries/Country',ModelType,string), 			const('Geometries/Country',ActiveModelTypes,string)		,const('Geometries/Country',ActiveModelTypes,string),const('Geometries/Country',ActiveModelTypes,string));
+		attribute<string> ZoneIdField := union_data(., proto_CsvDataToLoad/ZoneIdField, 	const('ISO',ModelType,string),							const('ISO',ActiveModelTypes,string)					,const('ISO',ActiveModelTypes,string),const('ISO',ActiveModelTypes,string));
+	}
+	
+
+	unit<uint32> proto_CsvDataToLoad: NrOfRows = 34
+	{
+		unit<uint32> inTable := range(uint32, 0, #CsvDataToLoad * NrAttributes)
+		{
+			attribute<string> Elements: 
+			//Name, SourcePath, TargetUnit, ZoneIdField
+			[
+			'FAOSTAT_curr_agri', 			'%ProjDir%/demand/FAOSTAT_basic_agricultural_areas',					'BoundarySets/BoundaryDomains/Countries','ISO',
+			'FAOSTAT_agri_demands',			'%ProjDir%/demand/FAOSTAT_agricultural_demands',						'BoundarySets/BoundaryDomains/Countries','ISO3',
+			'BaseMap_suitdef_Pastures',		'%ProjDir%/parameters/BaseMapAlloc/Pastures', 							'Geometries/Country', 	'ISO',
+			'Populator_coefs',				'%ProjDir%/parameters/PopulationRedistribution/redist_coefs_populate', 	'Geometries/Country', 	'ISO',
+			'PopulationPressure_coefs',		'%ProjDir%/parameters/PopulationPressure/press_coefs',					'Geometries/Country', 	'ISO',
+			'PopulationRedistr_coefs_urb',	'%ProjDir%/parameters/PopulationRedistribution/redist_coefs_urb',		'Geometries/Country', 	'ISO',
+			'PopulationRedistr_coefs_nurb',	'%ProjDir%/parameters/PopulationRedistribution/redist_coefs_nurb',		'Geometries/Country', 	'ISO',
+			'Pop_projections_SSP1',			'%ProjDir%/demand/SSP1/popproj',										'Geometries/Country', 	'Country',
+			'Pop_projections_SSP2',			'%ProjDir%/demand/SSP2/popproj',										'Geometries/Country', 	'Country',
+			'Pop_projections_SSP3',			'%ProjDir%/demand/SSP3/popproj',										'Geometries/Country', 	'Country',
+			'Pop_projections_SSP4',			'%ProjDir%/demand/SSP4/popproj',										'Geometries/Country', 	'Country',
+			'Pop_projections_SSP5',			'%ProjDir%/demand/SSP5/popproj',										'Geometries/Country', 	'Country',
+			'GDP_projections_SSP1',			'%ProjDir%/demand/SSP1/GDPproj',										'Geometries/Country', 	'ISO',
+			'GDP_projections_SSP2',			'%ProjDir%/demand/SSP2/GDPproj',										'Geometries/Country', 	'ISO',
+			'GDP_projections_SSP3',			'%ProjDir%/demand/SSP3/GDPproj',										'Geometries/Country', 	'ISO',
+			'GDP_projections_SSP4',			'%ProjDir%/demand/SSP4/GDPproj',										'Geometries/Country', 	'ISO',
+			'GDP_projections_SSP5',			'%ProjDir%/demand/SSP5/GDPproj',										'Geometries/Country', 	'ISO',
+			'Agric_trend',					'%ProjDir%/demand/Cocoa_trend/agric',									'BoundarySets/BoundaryDomains/Ghana_Regions_old10', 	'ISO',
+			'Agric_static',					'%ProjDir%/demand/Cocoa_static/agric',									'BoundarySets/BoundaryDomains/Ghana_Regions_old10', 	'ISO',
+			'Agric_LID',					'%ProjDir%/demand/Cocoa_LID/agric',										'BoundarySets/BoundaryDomains/Ghana_Regions_old10', 	'ISO',
+			'Agric_PF',						'%ProjDir%/demand/Cocoa_PF/agric',										'BoundarySets/BoundaryDomains/Ghana_Regions_old10', 	'ISO',
+			'Agric_LID_PF',					'%ProjDir%/demand/Cocoa_LID_PF/agric',									'BoundarySets/BoundaryDomains/Ghana_Regions_old10', 	'ISO',
+			'Cocoa_static',					'%ProjDir%/demand/Cocoa_static/cocoa',									'BoundarySets/BoundaryDomains/Ghana_Regions_old10', 	'ISO',
+			'Cocoa_trend',					'%ProjDir%/demand/Cocoa_trend/cocoa',									'BoundarySets/BoundaryDomains/Ghana_Regions_old10', 	'ISO',
+			'Cocoa_LID',					'%ProjDir%/demand/Cocoa_LID/cocoa',										'BoundarySets/BoundaryDomains/Ghana_Regions_old10', 	'ISO',
+			'Cocoa_PF',						'%ProjDir%/demand/Cocoa_PF/cocoa',										'BoundarySets/BoundaryDomains/Ghana_Regions_old10', 	'ISO',
+			'Cocoa_LID_PF',					'%ProjDir%/demand/Cocoa_LID_PF/cocoa',									'BoundarySets/BoundaryDomains/Ghana_Regions_old10', 	'ISO',
+			'Urban_density_model',			'%ProjDir%/demand/national_urban_density_models',						'Geometries/Country', 	'CountryCode',
+			'MatureForest_min_model',		'%ProjDir%/demand/UNFCCC_min_forestmature',								'Geometries/Country', 	'ISO',
+			'YoungForest_max_model',		'%ProjDir%/demand/UNFCCC_max_forestyoung',								'Geometries/Country', 	'ISO',
+			'General_transition_costs', 	'%ProjDir%/parameters/TransitionCosts/General',							'Classifications/ModelledTransitions',		'Transition',
+			'General_revenues', 			'%ProjDir%/parameters/Revenues/General',								'Classifications/ActiveModelTypes/mt32',	'Class',
+			'Ghana_ETH_Cocoa_areas', 		'%ProjDir%/parameters/Revenues/General',								'Classifications/ActiveModelTypes/mt32',	'Class',
+			'CIV_ETH_Cocoa_areas', 			'%AfricaSourceDataDir%/agriculture/cacao',								'Geometries/Country',	'Country'
+			];
+		}
+		attribute<string> Name: 		expr = "inTable/Elements[((id(.)*NrAttributes)+0)[inTable]]";
+		attribute<string> Path: 		expr = "inTable/Elements[((id(.)*NrAttributes)+1)[inTable]]";
+		attribute<string> TargetUnit: 	expr = "inTable/Elements[((id(.)*NrAttributes)+2)[inTable]]";
+		attribute<string> ZoneIdField: 	expr = "inTable/Elements[((id(.)*NrAttributes)+3)[inTable]]";
+		
+		parameter<uint32> NrAttributes: expr = "4";
+	}
+	unit<uint32> SpatialDataToLoad: NrOfRows = 30
+	{
+		
+		unit<uint32> inTable: expr = "range(uint32, 0, #SpatialDataToLoad * NrAttributes)"
+		{
+			attribute<string> Elements: 
+			//Name, SourceType, SourcePath, Additional
+			[
+			'Countries', 			'poly',      '%AfricaSourceDataDir%/boundaries/GADM_Africa_countries','shp',
+			'Riverbasins',			'poly',      '%AfricaSourceDataDir%/riverbasins/major_hydrobasins_Africa_v2','shp',
+			'MapSpam',				'poly',      '%AfricaSourceDataDir%/agriculture/MapSpam_2005_summary','shp',
+			'Ecoregions',		 	'poly',      '%AfricaSourceDataDir%/natural/eco_p_c_2017_Africa','shp',
+			'FUAs',			 		'poly',      '%AfricaSourceDataDir%/boundaries/Global_FUA_regions_ldd_la_lpp_lg_100_tmulti__v19E_Africa','shp',
+			'UrbanCentres',		 	'poly',      '%AfricaSourceDataDir%/boundaries/GHS_STAT_UCDB2015MT_GLOBE_R2019A_V1_0_Africa','shp',
+			'TravelTimeToCities',	'int32tiff', '%AfricaSourceDataDir%/accessibility/access_to_cities_Africa','tif',
+			'ruggedness',			'int32tiff', '%AfricaSourceDataDir%/physical/FINAL_tri_AFRICA_1km','tif',
+			'roughness',			'int32tiff', '%AfricaSourceDataDir%/physical/FINAL_roughness_AFRICA_1km','tif',
+			'slope',				'int32tiff', '%AfricaSourceDataDir%/physical/FINAL_slope_AFRICA_1km','tif',
+			'GHS_Pop_90',			'int32tiff', '%AfricaSourceDataDir%/population/GHSL_POP_GPW41E_1990_1km_Albers','tif',
+			'GHS_Pop_00',			'int32tiff', '%AfricaSourceDataDir%/population/GHSL_POP_GPW41E_2000_1km_Albers','tif',
+			'GHS_Pop_15',			'int32tiff', '%AfricaSourceDataDir%/population/GHSL_POP_GPW41E_2015_1km_Albers','tif',
+			'GHS_BU_90',			'int32tiff', '%AfricaSourceDataDir%/landuse/GHSL2018_1990_1km_Albers','tif',
+			'GHS_BU_00',			'int32tiff', '%AfricaSourceDataDir%/landuse/GHSL2018_2000_1km_Albers','tif',
+			'GHS_BU_14',			'int32tiff', '%AfricaSourceDataDir%/landuse/GHSL2018_2014_1km_Albers','tif',
+			'crops_fract_meansd',	'int32tiff', '%AfricaSourceDataDir%/landuse/copernicus_GLC_v2_0_1_crops_fract_Africa_1km_meansd_f32', 'tif',
+			'grass_fract_meansd',	'int32tiff', '%AfricaSourceDataDir%/landuse/copernicus_GLC_v2_0_1_grass_fract_Africa_1km_meansd_f32', 'tif',
+			'shrubs_fract_meansd',		'int32tiff', '%AfricaSourceDataDir%/landuse/copernicus_GLC_v2_0_1_shrubs_fract_Africa_1km_meansd_f32','tif',
+			'MainRoads_topo',			'polyline',  '%AfricaSourceDataDir%/transport/MainRoads_topo','shp',
+			'ghsl_uc',					'poly',      '%AfricaSourceDataDir%/urbancentres/GHS_STAT_UCDB2015MT_GLOBE_R2019A_V1_0_Africa_epsg102022','shp',
+			'CIV_ETH_Cocoa_areas',      'poly',  '%AfricaSourceDataDir%/agriculture/cacao/CIV_ETH_Cocoa_areas_AEA','gpkg',
+			'CIV_Ghana_ProtAreas_IUCN', 'poly',  '%AfricaSourceDataDir%/agriculture/cacao/CIV_Ghana_ProtAreas_IUCN_AEA','gpkg',
+			'CIV_Ghana_WaterBod',       'poly',  '%AfricaSourceDataDir%/agriculture/cacao/CIV_Ghana_WaterBod_AEA','gpkg',
+			'CIV_Regions_admin1',       'poly',  '%AfricaSourceDataDir%/agriculture/cacao/CIV_Regions_admin1_AEA','gpkg',
+			// 'cocoa_climate_suit_2016',  'float32tiff','%AfricaSourceDataDir%/agriculture/cacao/cocoa_climate_suit_2016','tif',
+			'cocoa_climate_suit_2016',  'float32tiff','%AfricaSourceDataDir%/agriculture/cacao/cocoa_climate_suit_2016_float32_AEA','tif',
+			'cocoa_ETH_2022',           'uint8tiff','%AfricaSourceDataDir%/agriculture/cacao/cocoa_ETH_2022_Fractie_100m_AEA','tif',
+			// 'cocoa_ETH_2022',           'booltiff','%AfricaSourceDataDir%/agriculture/cacao/cocoa_ETH_2022_bool_AEA','tif',
+			// 'cocoa_ETH_2022',           'uint8tiff','%AfricaSourceDataDir%/agriculture/cacao/cocoa_ETH_2022_uint8_AEA','tif',
+			'Ghana_ETH_Cocoa_areas',    'poly',  '%AfricaSourceDataDir%/agriculture/cacao/Ghana_ETH_Cocoa_areas_AEA','gpkg',
+			'Ghana_Regions_old10',       'poly',  '%AfricaSourceDataDir%/agriculture/cacao/Ghana_Regions_AEA','gpkg',
+			'Ghana_Regions_admin1',     'poly',  '%AfricaSourceDataDir%/agriculture/cacao/Ghana_Regions_admin1_AEA','gpkg'
+			];
+		}
+		
+		attribute<string> Name: expr = "inTable/Elements[((id(.)*NrAttributes)+0)[inTable]]";
+		attribute<string> Type: expr = "inTable/Elements[((id(.)*NrAttributes)+1)[inTable]]";
+		attribute<string> Path: expr = "inTable/Elements[((id(.)*NrAttributes)+2)[inTable]]";
+		attribute<string> Ext : expr = "inTable/Elements[((id(.)*NrAttributes)+3)[inTable]]";
+		
+		parameter<uint32> NrAttributes := 4;
+	}
+	unit<uint32> BoundarySets: NrOfRows = 7
+	{
+		parameter<uint32> NrAttributes: expr = "3";
+		
+		unit<uint32> inTable: expr = "range(uint32, 0, #SpatialDataToLoad * NrAttributes)"
+		{
+			attribute<string> Elements:
+			// Name, ZoneIdCode, OrgLoadingAddress
+			[
+				'Countries', 	'ISO',		'BaseData/LoadSpatialData/Countries/inFile',
+				'Riverbasins',	'',			'BaseData/LoadSpatialData/Riverbasins/inFile',
+				'MapSpam',		'',			'BaseData/LoadSpatialData/MapSpam/inFile',
+				'Ecoregions',	'',			'BaseData/LoadSpatialData/Ecoregions/inFile',
+				'FUAs',			'',			'BaseData/LoadSpatialData/Ecoregions/inFile',
+				'UrbanCentres',	'',			'BaseData/LoadSpatialData/Ecoregions/inFile',
+				'Ghana_Regions_old10',	'ZoneCode',	'BaseData/LoadSpatialData/Ghana_Regions_old10/inFile'
+			];
+		}
+		attribute<string> Name: 		expr = "inTable/Elements[((id(.)*NrAttributes)+0)[inTable]]";
+		attribute<string> ZoneIdDef: 	expr = "inTable/Elements[((id(.)*NrAttributes)+1)[inTable]]";
+		attribute<string> Address: 		expr = "inTable/Elements[((id(.)*NrAttributes)+2)[inTable]]";
+	}
+	Container Wij
+	{
+		unit<SPoint> Default: 	Expr = "QueensCase";		
+		unit<SPoint> RooksCase: Expr = "range(spoint, point(int16(-1), int16(-1)), point(int16(2), int16(2)))", Descr = "Rooks case contiguous neighbours (first order)"
+		{	
+			attribute<UInt32>  Dist2: Expr = "Dist2(point(Int16(0), Int16(0), .), uint32)"; // Sqare distance to origin (= cell with row=0 and col=0) in raster cell units.
+			attribute<Float64> Attr : Expr = "float64(Dist2 > 0  && Dist2 <= (1))"; //
+			attribute<Float32> Matr : Expr = "scalesum(Float32(Attr), Float32(1.0))"; // divides Attr by the sum of Attr so that the sum of Matr equals 1.
+		}
+ 		unit<SPoint> QueensCase: Expr = "range(spoint, point(int16(-1), int16(-1)), point(int16(2), int16(2)))", Descr = "Queens case contiguous neighbours (first order)"
+		{	
+			attribute<UInt32>  Dist2: Expr = "Dist2(point(Int16(0), Int16(0), .), uint32)"; // Sqare distance to origin (= cell with row=0 and col=0) in raster cell units.
+			attribute<Float64> Attr : Expr = "float64(Dist2 > 0  && Dist2 <= (2))"; //
+			attribute<Float32> Matr : Expr = "scalesum(Float32(Attr), Float32(1.0))"; // divides Attr by the sum of Attr so that the sum of Matr equals 1.
+		}
+		unit<SPoint> oldMapSpamInterpolation: expr = "range(spoint, point(int16(-6), int16(-6)), point(int16(7), int16(7)))" {
+			attribute<UInt32>  Dist2: 	Expr = "Dist2(point(Int16(0), Int16(0), .), uint32)";
+			attribute<float32> Attr:	Expr = "Dist2 > 0 && Dist2 < 7*7 ? float32(Dist2)^float32(-1) : float32(0)";
+		}
+		unit<SPoint> MapSpamInterpolation: expr = "AccessInterpolation";
+		unit<SPoint> AccessInterpolation: expr = "range(spoint, point(int16(-11), int16(-11)), point(int16(12), int16(12)))" {
+			attribute<UInt32>  Dist2: 	Expr = "Dist2(point(Int16(0), Int16(0), .), uint32)";
+			attribute<float32> Attr:	Expr = "Dist2 > 0 && Dist2 < 12*12 ? float32(Dist2)^float32(-1) : float32(0)";
+		}
+		unit<SPoint> AccessComparison: expr = "range(spoint, point(int16(-20), int16(-20)), point(int16(21), int16(21)))" {
+			attribute<UInt32>  Dist2: 	Expr = "Dist2(point(Int16(0), Int16(0), .), uint32)";
+			attribute<float32> Attr:	Expr = "Dist2 < 20*20 ? float32(1) : float32(0)";
+		}
+		unit<SPoint> KM120_summation: expr = "range(spoint, point(int16(-120), int16(-120)), point(int16(121), int16(121)))" {
+			attribute<UInt32>  Dist2: 	Expr = "Dist2(point(Int16(0), Int16(0), .), uint32)";
+			attribute<float32> Attr:	Expr = "Dist2 < (120*120)+1 ? float32(1) : float32(0)";
+			attribute<float32> Matr:	Expr = "scalesum(float32(1)  / float32(sqrt(Dist2+1)), float32(1.0))";
+		}
+		unit<SPoint> cocoa_summation: expr = "range(spoint, point(int16(-20), int16(-20)), point(int16(21), int16(21)))" {
+			attribute<UInt32>  Dist2: 	Expr = "Dist2(point(Int16(0), Int16(0), .), uint32)";
+			attribute<float32> Attr:	Expr = "switch(case(Dist2 = 0, 0f), case(Dist2 > (20*20), 0f), 0.9722f*exp(-0.228f*float32(sqrt(Dist2))))";
+			attribute<float32> Matr:	Expr = "Dist2 > 0 ? Attr / max(Attr) : 1f";
+			
+		}
+	}
+}

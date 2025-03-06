@@ -1,0 +1,229 @@
+Container Accessibility: Using = "Geometries;" {
+	
+	parameter<int32>   ds        := 100i;
+	parameter<float64> ds64      := ds[float64];
+	parameter<float32> distdecay := float32(-1.5);
+	parameter<string>  speed_def := 'float32(MSPEED_INT) > float32(0) ? float32(MSPEED_INT) : Classifications/SpeedStats/Mean_Speed[SpeedStatId]';
+	
+	unit<ipoint> j_grid := range(proto_j_grid, point(0i,0i,ipoint), upperbound(Base_grid_100m) / point(ds,ds,ipoint) ), DialogData = "BaseProjection" 
+	{
+		attribute<int32> rownr  := pointRow(id(.));
+		attribute<bool>  uneven := mod(rownr, 2i) > 0i;
+	}
+	
+	unit<dpoint> proto_j_grid := gridset(BaseProjection, GetProjectionFactor(Base_grid_100m) * point(ds64, ds64, BaseProjection), GetProjectionOffSet(Base_grid_100m), BaseProjection);
+	unit<ipoint> PopGrid      := Geometries/SelectedTiledRaster1k, Using = "/ResultsGathering/ReadOnly/Pop;";
+	
+	
+	container Indicators_from_mozaik
+	{
+		container Boundaries
+		{
+			container UnitSets32
+			{
+				unit<uint32> RunRegions := BaseData/BoundarySets/RawBoundaryDomains/RunRegions/Set32; 
+			}
+			container UnitSets16
+			{
+				unit<uint16> RunRegions := range(uint16, uint16(0), uint16(#UnitSets32/RunRegions))
+				{
+					attribute<geometries/BaseProjection> Geometry (poly):= UnitSets32/RunRegions/Geometry[Nr_OrgEntity];
+					attribute<string>                    ZoneId         := UnitSets32/RunRegions/ZoneId[Nr_OrgEntity];
+					attribute<UnitSets32/RunRegions>     Nr_OrgEntity   := id(.)[UnitSets32/RunRegions];
+					attribute<UnitSets32/RunRegions>     OrgRef         := Nr_OrgEntity;
+				}
+			}
+			container RasterSets32
+			{
+				attribute<uint32> RunRegions (Geometries/SelectedTiledRaster1k) := poly2grid(UnitSets32/RunRegions/Geometry, Geometries/SelectedTiledRaster1k)[uint32];
+			}
+			container RasterSets16
+			{
+				attribute<UnitSets16/RunRegions> RunRegions (Geometries/SelectedTiledRaster1k):= RasterSets32/RunRegions[UnitSets16/RunRegions];
+			}
+		}
+		
+		container Setup     := for_each_ne(MetaData/Periods/sYear, 'Accessibility_Setup(PopGrid, BaseData/LoadSpatialData/MainRoads_topo/inFile, Geometries/Country, '+quote('float32(ResultsGathering/ReadOnly/Pop/'+MetaData/Periods/sYear+')')+', 600f)');
+		container Calc      := for_each_ne(MetaData/Periods/sYear, 'PotentialAccessCalc(Setup/'+MetaData/Periods/sYear+'/Matrix, PopGrid, Setup/'+MetaData/Periods/sYear+'/P, Setup/'+MetaData/Periods/sYear+'/Centroids)');
+		container Ai_Store  := for_each_nedva(MetaData/Periods/sYear, 'int32(Calc/'+MetaData/Periods/sYear+'/Ag)', PopGrid, int32, '%LocalDataProjDir%/'+RunSettings/ScenarioName+'/indicators/ai_'+string(MetaData/Periods/Year)+'.tif');
+		container TPi_Store := for_each_nedva(MetaData/Periods/sYear, 'float32(Calc/'+MetaData/Periods/sYear+'/TPg)', PopGrid, float32, '%LocalDataProjDir%/'+RunSettings/ScenarioName+'/indicators/ai_'+string(MetaData/Periods/Year)+'.tif');
+	}
+	
+	Template Accessibility_Setup 
+	{
+		unit<ipoint> MG; // model grid
+		unit<uint32> LU; // line unit 
+		unit<uint32> RR; // run region
+		parameter<string>  P_def;
+		parameter<float32> tmax   := 60000f;
+		attribute<float32> P (MG) := = P_def; // Population grid
+		
+		container Centroids := GenerateCentroids(MG, P);
+		
+		unit<uint32> RawLines:= LU 
+		{
+			attribute<bool> frompoint_in: 	 = !IsNull(point_in_polygon(first_point(Geometry), 	RR/Geometry));
+			attribute<bool> topoint_in: 	 = !IsNull(point_in_polygon(last_point(	Geometry), 	RR/Geometry));
+			attribute<bool> sel: 			 = frompoint_in || topoint_in;
+			attribute<float32> 	speed:		 = = speed_def;
+			attribute<string>	roadspec:	 = HIGHWAY + '_x_';
+			attribute<Classifications/SpeedStats> SpeedStatId:  = rlookup(roadspec, Classifications/SpeedStats/Name);
+		}
+		unit<uint32> Lines:= subset(RawLines/sel), DialogData = "Geometry", DialogType = "map" 
+		{
+			attribute<BaseProjection> Geometry (arc):= RawLines/Geometry[Nr_OrgEntity];
+			attribute<float32>		  Length_km     := float32(arc_length(Geometry, float64)) / 1000f;
+			attribute<BaseProjection> FromPoint     := first_point(Geometry);
+			attribute<BaseProjection> ToPoint       := last_point(Geometry);
+			attribute<float32>		  Speed         := RawLines/speed[Nr_OrgEntity];
+			
+			unit<uint32> PointSet := union_unit(Lines, Lines)
+			{
+				attribute<BaseProjection> Points := union_data(., FromPoint, ToPoint);
+			}
+			unit<uint32> NodeSet := unique(PointSet/Points);
+			
+			attribute<NodeSet>  F1:= rlookup(FromPoint, 	NodeSet/Values);
+			attribute<NodeSet>  F2:= rlookup(ToPoint, 	NodeSet/Values);
+			attribute<checkNet> NetNr:= checkNet/PartNr[F1];
+			attribute<bool>     Select:= checkNet/SelNet[NetNr], IntegrityCheck = "checkNet/NoSubstantialMisses";
+			
+			unit<uint32> checkNet := connected_parts(F1, F2)
+			{
+				attribute<float32> LengthPerPart       := sum(Length_km, NetNr);
+				attribute<bool>    SelNet              := LengthPerPart = max(LengthPerPart);
+				attribute<bool>    SubstantialMiss     := !SelNet && ((LengthPerPart / sum(LengthPerPart)) > 0.25f);
+				parameter<bool>    NoSubstantialMisses := all(!SubstantialMiss);
+			}
+		}
+		unit<uint32> LinesToConnect: = subset(Lines/Select), DialogData = "Geometry", DialogType = "map" 
+		{
+			attribute<BaseProjection> Geometry (arc):= Lines/Geometry[Nr_OrgEntity];
+			attribute<float32>		  Length_km:= float32(arc_length(Geometry, float64)) / float32(1000);
+			attribute<BaseProjection> FromPoint:= first_node(Geometry);
+			attribute<BaseProjection> ToPoint:= last_node(Geometry);
+			attribute<float32>		  Speed:= Lines/speed[Nr_OrgEntity];
+		}
+		
+		unit<uint32> Network:  = connect(LinesToConnect/Geometry, Centroids/all_centroids/point), DialogData = "Geometry", DialogType = "map" 
+		{	
+			unit<uint32> Org: 	 = Centroids/i32;
+			unit<uint32> Dest: 	 = Centroids/j_inside32;
+			
+			attribute<BaseProjection> Geometry (arc): 	 = UnionData;
+			attribute<float32>		  Length_km:		 = float32(arc_length(Geometry, float64)) / float32(1000);
+			attribute<BaseProjection> FromPoint:		 = first_node(Geometry);
+			attribute<BaseProjection> ToPoint:			 = last_node(Geometry);
+			
+			attribute<float32>		  Speed:			 = MakeDefined(LinesToConnect/Speed[Nr_OrgEntity], Classifications/SpeedStats/Connector_Speed);
+			attribute<float32>		  Impedance:		 = IsDefined(Nr_OrgEntity) ? (Length_km / Speed) * float32(60) : max_elem((Length_km / Speed) * float32(60), float32(1)); // impedance in minutes
+			
+			unit<uint32> PointSet: 	 = union_unit(Network, Network)
+			{
+				attribute<BaseProjection> Points:  = union_data(., FromPoint, ToPoint);
+			}
+			unit<uint32> NodeSet:	 = unique(PointSet/Points), DialogData = "Values", DialogType = "map";
+			
+			attribute<NodeSet> orgZone (Org):= rlookup(Org/centroid, NodeSet/Values);
+			attribute<NodeSet> destZone (Dest):= rlookup(Dest/centroid, NodeSet/Values);
+			
+			attribute<NodeSet>F1 := rlookup(FromPoint, 	NodeSet/Values);
+			attribute<NodeSet>F2 := rlookup(ToPoint, 	NodeSet/Values);
+		}
+		
+		unit<uint32> Matrix := 
+			dijkstra_m('bidirectional;startPoint(Node_rel);endPoint(Node_rel);cut(OrgZone_max_imp);od:impedance,OrgZone_rel,DstZone_rel'
+				, Network/Impedance
+				, Network/F1
+				, Network/F2
+				, Network/orgZone
+				, Network/destZone
+				, tmax
+			) 
+		{
+			attribute<float32> EuclDist_km:= float32(dist(Network/Org/centroid[OrgZone_rel], Network/Dest/centroid[DstZone_rel])) / float32(1000);
+		}
+	}
+	
+	Template PotentialAccessCalc 
+	{
+		unit<uint32> Matrix;
+		unit<ipoint> MG; // model grid
+		attribute<float32> Pg (MG); // Population grid
+		
+		container Centroids {
+			attribute<j_grid> 	j_grid_ref 		(MG);
+			attribute<j_inside>	j_inside_ref 	(MG);
+			unit<uint64> j_inside;
+			unit<uint64> i;
+			unit<uint32> i32;
+			unit<uint32> j_inside32;
+		}
+
+		
+		// potentially subject to user input specifications: 
+		// Matrix/Impedance^distdecay
+		// Matrix/Impedance <= float32(90)
+		// Matrix/EuclDist_km <= float32(120)
+		// float32(Matrix/EuclDist_km / 130f) * 60f)
+		
+		attribute<float32> Pj         (Centroids/j_inside32) := sum(Pg, Centroids/j_inside_ref)[Centroids/j_inside32/org]; //population
+		attribute<float32> Ai         (Centroids/i32)        := sum(Pj[Matrix/DstZone_rel] * (Matrix/Impedance^distdecay), Matrix/OrgZone_rel); //potential accesibility
+		attribute<float32> Ag         (MG)                   := MakeDefined(Ai[Centroids/i32_ref], (potential(Ai[Centroids/i32_ref], MetaData/Wij/AccessInterpolation/Attr) /  Centroids/OrgsWeight)); //potential accesibility spatially interpolated to grid
+		attribute<float32> neighw     (MG)                   := Ag / (potential(Ag, MetaData/Wij/AccessComparison/Attr) / potential(float32(!IsNull(Ag)), MetaData/Wij/AccessComparison/Attr)); // neighbourhood weights
+		// below: implementation of DG Regio transport performance
+		attribute<float32> Pop90min_i (Centroids/i32)        := sum(Pj[Matrix/DstZone_rel] * float32(Matrix/Impedance <= float32(90)), Matrix/OrgZone_rel); //population within 90 min drive
+		attribute<float32> Pop120km_i (Centroids/i32)        := sum(Pj[Matrix/DstZone_rel] * float32(Matrix/EuclDist_km <= float32(120)), Matrix/OrgZone_rel); //population within 120km drive
+		attribute<float32> TPi		  (Centroids/i32)        := Pop90min_i / Pop120km_i;	//
+		attribute<float32> TPg	 	  (MG)                   := MakeDefined(TPi[Centroids/i32_ref], (potential(TPi[Centroids/i32_ref], MetaData/Wij/AccessInterpolation/Attr) /  Centroids/OrgsWeight)); //per grid
+		attribute<float32> NEleft_i	  (centroids/i32)        := sum(Pj[Matrix/DstZone_rel] * (float32(Matrix/Impedance) / (float32(Matrix/EuclDist_km / 130f) * 60f)), Matrix/OrgZone_rel); //pre stap
+		attribute<float32> NE_i		  (centroids/i32)        := 1f / (NEleft_i / sum(Pj[Matrix/DstZone_rel], Matrix/OrgZone_rel));//network efficiency (compare network to euclidian with max dist)
+		attribute<float32> NEg		  (MG)                   := MakeDefined(NE_i[Centroids/i32_ref], (potential(NE_i[Centroids/i32_ref], MetaData/Wij/AccessInterpolation/Attr) /  Centroids/OrgsWeight));
+	}
+	
+	Template GenerateCentroids
+	{
+		unit<ipoint> ModelGrid;
+		attribute<float32>        Pop (ModelGrid);
+		attribute<j_grid>         j_grid_ref (ModelGrid)   := id(ModelGrid)[j_grid];
+		attribute<j_inside>       j_inside_ref (ModelGrid) := invert(j_inside/Nr_OrgEntity)[j_grid_ref];
+		attribute<BaseProjection> bpoint (ModelGrid)       := id(ModelGrid)[BaseProjection] + (GetProjectionFactor(ModelGrid) / point(2d, 2d, dpoint));
+		attribute<float64>        wPop (ModelGrid)         := float64(!IsNull(Boundaries/RasterSets16/RunRegions)) * float64(Pop);
+		
+		
+		attribute<bool>           inRunRegion (j_grid)     := any(!IsNull(Boundaries/RasterSets16/RunRegions), j_grid_ref);
+		attribute<float32>        Pj (j_grid)              := sum(Pop, j_grid_ref);
+
+		unit<uint64> i := j_inside, DialogData = "centroid", DialogType = "map"
+		{
+			attribute<BaseProjection>  centroid    := Nr_OrgEntity[BaseProjection] + (j_grid/uneven[Nr_OrgEntity] ? (GetProjectionFactor(j_grid) / point(2d, 1d, dpoint)) : (GetProjectionFactor(j_grid) / point(2d, 2d, dpoint)));
+			attribute<bool>            overlap_w_j := !IsNull(rlookup(centroid, j_inside/centroid));
+		}
+		
+		unit<uint64> j_inside := subset(inRunRegion), DialogData = "centroid", DialogType = "map"
+		{
+			attribute<BaseProjection> orgpoint  := Nr_OrgEntity[BaseProjection] + (GetProjectionFactor(j_grid) / point(3d, 3d, dpoint));
+			attribute<BaseProjection> centroid  := Pj > float64(0) ? sum(bpoint * point(wPop,wPop,dpoint), j_inside_ref) / sum(point(wPop,wPop,dpoint), j_inside_ref) : orgpoint;
+			attribute<float64>        Pj        := sum(wPop, j_inside_ref);
+		}
+		unit<uint32> i32 :=range(uint32, 0, uint32(#i)), DialogData = "centroid", DialogType = "map" 
+		{
+			attribute<i>               org      := id(.)[i];
+			attribute<BaseProjection>  centroid := i/centroid[org];
+			attribute<ModelGrid>       GridId   := centroid[ModelGrid];
+		}
+		unit<uint32> j_inside32 := range(uint32, 0, uint32(#j_inside)), DialogData = "centroid", DialogType = "map" 
+		{
+			attribute<j_inside>        org:= id(.)[j_inside];
+			attribute<BaseProjection>  centroid:= j_inside/centroid[org];
+		}
+		
+		attribute<i32>     i32_ref    (ModelGrid) := invert(i32/GridId);
+		attribute<float32> OrgsWeight (ModelGrid) := potential(float32(!IsNull(i32_ref)), MetaData/Wij/AccessInterpolation/Attr);
+		
+		unit<uint32> all_centroids := union_unit(i, j_inside)
+		{
+			attribute<BaseProjection> point := union_data(., i/centroid, j_inside/centroid);
+		}
+	}
+}

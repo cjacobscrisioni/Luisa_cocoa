@@ -1,0 +1,112 @@
+container cocoa_revenue_modifiers {
+	
+	
+	unit<uint32> scenario_revenues:= subset(revenue_inputs/Scenario_rel = /RunSettings/Scenarios/second_rel[RunSettings/ScenarioId]) {
+		attribute<Classifications/ActiveModelTypes> Landuse_rel:= revenue_inputs/Landuse_rel[Nr_OrgEntity];
+		attribute<BaseData/BoundarySets/RawBoundaryDomains/Ghana_Regions_old10/Set16> Region_rel:= rlookup(uppercase(inregion), uppercase(BaseData/BoundarySets/RawBoundaryDomains/Ghana_Regions_old10/Set16/ZoneId));
+		attribute<upoint> 	unirel:= point(uint32(Landuse_rel), uint32(Region_rel), upoint);
+		attribute<string> 	inregion:= revenue_inputs/inregion[Nr_OrgEntity];
+		attribute<float32> 	revfactor:= revenue_inputs/infactor[Nr_OrgEntity];
+	}
+	
+	
+	
+	
+	
+	unit<uint32> revenue_inputs: nrofrows = 78 {
+		
+		//
+		
+		attribute<RunSettings/Cocoa_Scenarios> Scenario_rel:= rlookup(uppercase('cocoa_'+inscenario), uppercase(RunSettings/Cocoa_Scenarios/LabelText));
+		attribute<Classifications/ActiveModelTypes> Landuse_rel:= rlookup(uppercase(inlanduse), uppercase(Classifications/ActiveModelTypes/name));
+			
+		attribute<string> inregion:= inMatrix/line[((id(.)*4)+0)[inMatrix]];
+		attribute<string> inlanduse:= inMatrix/line[((id(.)*4)+1)[inMatrix]];
+		attribute<string> inscenario:= inMatrix/line[((id(.)*4)+2)[inMatrix]];
+		attribute<float32> infactor:= float32(inMatrix/line[((id(.)*4)+3)[inMatrix]]);
+		
+		unit<uint32> inMatrix:= range(uint32, 0, 78*4) {
+			
+			attribute<string> line: [
+				'WES',	'Crops',	'lid',	'1.01486016804099',
+				'WES',	'Crops',	'pf',	'1.00570477074491',
+				'WES',	'Crops',	'lid_pf',	'1.01824726724971',
+				'CEN',	'Crops',	'lid',	'1.01211178968459',
+				'CEN',	'Crops',	'pf',	'1.00423011931989',
+				'CEN',	'Crops',	'lid_pf',	'1.01397822052917',
+				'ACC',	'Crops',	'lid',	'1.00825385736661',
+				'ACC',	'Crops',	'pf',	'1.00251712389939',
+				'ACC',	'Crops',	'lid_pf',	'1.00920432039063',
+				'VOL',	'Crops',	'lid',	'1.01235475768791',
+				'VOL',	'Crops',	'pf',	'1.0043742006397',
+				'VOL',	'Crops',	'lid_pf',	'1.01514771180075',
+				'EAS',	'Crops',	'lid',	'1.01420752096381',
+				'EAS',	'Crops',	'pf',	'1.0054320472019',
+				'EAS',	'Crops',	'lid_pf',	'1.01698635765471',
+				'ASH',	'Crops',	'lid',	'1.01537878490846',
+				'ASH',	'Crops',	'pf',	'1.00625971508224',
+				'ASH',	'Crops',	'lid_pf',	'1.0191399955936',
+				'BRA',	'Crops',	'lid',	'1.01420895440926',
+				'BRA',	'Crops',	'pf',	'1.00541478435817',
+				'BRA',	'Crops',	'lid_pf',	'1.01697988720931',
+				'NOR',	'Crops',	'lid',	'1.00667493359186',
+				'NOR',	'Crops',	'pf',	'1.00126319868683',
+				'NOR',	'Crops',	'lid_pf',	'1.0070441814679',
+				'UPE',	'Crops',	'lid',	'1.00608286724707',
+				'UPE',	'Crops',	'pf',	'1.00111870560376',
+				'UPE',	'Crops',	'lid_pf',	'1.00626374458548',
+				'UPW',	'Crops',	'lid',	'1.01012367090165',
+				'UPW',	'Crops',	'pf',	'1.00286850299224',
+				'UPW',	'Crops',	'lid_pf',	'1.01124370409778',
+				'WES',	'Cocoa',	'lid',	'1.29116369669406',
+				'WES',	'Cocoa',	'pf',	'1.18167110553856',
+				'WES',	'Cocoa',	'lid_pf',	'1.48612257415343',
+				'CEN',	'Cocoa',	'lid',	'1.26880513149639',
+				'CEN',	'Cocoa',	'pf',	'1.13685017021419',
+				'CEN',	'Cocoa',	'lid_pf',	'1.41015727957457',
+				'VOL',	'Cocoa',	'lid',	'1.11726119237455',
+				'VOL',	'Cocoa',	'pf',	'1.05708168906683',
+				'VOL',	'Cocoa',	'lid_pf',	'1.18795936335559',
+				'EAS',	'Cocoa',	'lid',	'1.23802033866415',
+				'EAS',	'Cocoa',	'pf',	'1.12251324051261',
+				'EAS',	'Cocoa',	'lid_pf',	'1.36733110980461',
+				'ASH',	'Cocoa',	'lid',	'1.27377382937352',
+				'ASH',	'Cocoa',	'pf',	'1.14251608956592',
+				'ASH',	'Cocoa',	'lid_pf',	'1.42233714630363',
+				'BRA',	'Cocoa',	'lid',	'1.25142580750358',
+				'BRA',	'Cocoa',	'pf',	'1.13240546962638',
+				'BRA',	'Cocoa',	'lid_pf',	'1.39103632916447',
+				'WES',	'YoungForest',	'lid',	'0.997771806299203',
+				'CEN',	'YoungForest',	'lid',	'0.997771806299203',
+				'ACC',	'YoungForest',	'lid',	'0.997771806299203',
+				'VOL',	'YoungForest',	'lid',	'0.997771806299203',
+				'EAS',	'YoungForest',	'lid',	'0.997771806299203',
+				'ASH',	'YoungForest',	'lid',	'0.997771806299203',
+				'BRA',	'YoungForest',	'lid',	'0.997771806299203',
+				'NOR',	'YoungForest',	'lid',	'0.997771806299203',
+				'UPE',	'YoungForest',	'lid',	'0.997771806299203',
+				'UPW',	'YoungForest',	'lid',	'0.997771806299203',
+				'WES',	'YoungForest',	'pf',	'0.998460318669967',
+				'CEN',	'YoungForest',	'pf',	'0.998460318669967',
+				'ACC',	'YoungForest',	'pf',	'0.998460318669967',
+				'VOL',	'YoungForest',	'pf',	'0.998460318669967',
+				'EAS',	'YoungForest',	'pf',	'0.998460318669967',
+				'ASH',	'YoungForest',	'pf',	'0.998460318669967',
+				'BRA',	'YoungForest',	'pf',	'0.998460318669967',
+				'NOR',	'YoungForest',	'pf',	'0.998460318669967',
+				'UPE',	'YoungForest',	'pf',	'0.998460318669967',
+				'UPW',	'YoungForest',	'pf',	'0.998460318669967',
+				'WES',	'YoungForest',	'lid_pf',	'0.995986208872496',
+				'CEN',	'YoungForest',	'lid_pf',	'0.995986208872496',
+				'ACC',	'YoungForest',	'lid_pf',	'0.995986208872496',
+				'VOL',	'YoungForest',	'lid_pf',	'0.995986208872496',
+				'EAS',	'YoungForest',	'lid_pf',	'0.995986208872496',
+				'ASH',	'YoungForest',	'lid_pf',	'0.995986208872496',
+				'BRA',	'YoungForest',	'lid_pf',	'0.995986208872496',
+				'NOR',	'YoungForest',	'lid_pf',	'0.995986208872496',
+				'UPE',	'YoungForest',	'lid_pf',	'0.995986208872496',
+				'UPW',	'YoungForest',	'lid_pf',	'0.995986208872496'
+			];
+		}
+	}
+}

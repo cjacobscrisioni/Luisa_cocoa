@@ -1,0 +1,55 @@
+set pf="Program Files"
+set config=G:\ProjDir\Africa\trunk\cfg
+set geodmsversion=GeoDMS7166
+
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/AGO/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/BDI/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/BEN/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/BFA/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/BWA/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/CAF/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/CIV/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/CMR/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/COD/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/COG/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/DJI/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/DZA/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/EGY/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/ERI/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/ESH/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/ETH/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/GAB/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/GHA/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/GIN/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/GNB/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/GNQ/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/KEN/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/LBR/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/LBY/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/LSO/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/MAR/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/MDG/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/MLI/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/MOZ/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/MRT/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/MWI/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/NAM/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/NER/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/NGA/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/RWA/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/SC1/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/SC2/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/SDNSSD/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/SENGMB/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/SLE/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/SOM/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/SWZ/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/TCD/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/TGO/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/TUN/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/TZA/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/UGA/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/ZAF/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/ZMB/VariablePreparation/Landuse
+C:\%pf%\ObjectVision\%geodmsversion%\GeoDmsRun.exe %config%\Africa.dms PerCountryGroup/ZWE/VariablePreparation/Landuse
+

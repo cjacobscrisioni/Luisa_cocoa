@@ -1,0 +1,130 @@
+Container BoundarySets: Using = "MetaData;"
+{
+	container RawBoundaryDomains: expr = "for_each_ne(MetaData/BoundarySets/Name, 'BoundaryDefinition('+ string(id(MetaData/BoundarySets)) +')')"
+	{
+		Container RunRegions {
+			unit<uint32> Set32: expr = "Geometries/CountryGroup", DialogData = "Geometry", DialogType = "Map"
+			{
+				attribute<geometries/BaseProjection> 	Geometry (poly): 	expr = "partitioned_union_polygon(Geometries/Country/Geometry[ipoint], Geometries/Country/CountryGroupId)[geometries/BaseProjection]";
+				attribute<string> 						zoneId: 			expr = "Geometries/CountryGroup/Code";
+				attribute<string>						Label:				expr = "zoneId";
+				attribute<bool>							select:				expr = "Geometries/CountryGroup/select";
+			}
+			unit<uint16> Set16: expr = "range(uint16, uint16(0), uint16(#Set32))" {
+				attribute<geometries/BaseProjection> 	Geometry (poly): 	expr = "Set32/Geometry[Nr_OrgEntity]";
+				attribute<string> 						ZoneId: 			expr = "Set32/ZoneId[Nr_OrgEntity]";
+				attribute<Set32> 						Nr_OrgEntity: 		expr = "id(.)[Set32]";
+				attribute<string>						Label:				expr = "zoneId";
+			}
+		}
+		Container MozaikRegions {
+			unit<uint32> Set32: expr = "subset(RunRegions/Set32/select)" {
+				attribute<geometries/BaseProjection> 	Geometry (poly): 	expr = "RunRegions/Set32/Geometry[Nr_OrgEntity]";
+				attribute<string> 						zoneId: 			expr = "RunRegions/Set32/Geometry/Code[Nr_OrgEntity]";
+				attribute<string>						Label:				expr = "zoneId";
+			}
+			unit<uint16> Set16: expr = "range(uint16, uint16(0), uint16(#Set32))" {
+				attribute<geometries/BaseProjection> 	Geometry (poly): 	expr = "Set32/Geometry[Nr_OrgEntity]";
+				attribute<string> 						ZoneId: 			expr = "Set32/ZoneId[Nr_OrgEntity]";
+				attribute<Set32> 						Nr_OrgEntity: 		expr = "id(.)[Set32]";
+				attribute<string>						Label:				expr = "zoneId";
+			}
+		}
+	}
+	
+	container BoundaryDomains: expr = "for_each_ind('nex', MetaData/BoundarySets/Name, 'RawBoundaryDomains/'+ MetaData/BoundarySets/Name + '/Set32',uint32)"
+	{ unit<uint32> RunRegions: expr = "RawBoundaryDomains/RunRegions/Set32"; unit<uint32> MozaikRegions: expr = "RawBoundaryDomains/MozaikRegions/Set32";}
+	container BoundaryDomains16: expr = "for_each_ind('nex', MetaData/BoundarySets/Name, 'RawBoundaryDomains/'+ MetaData/BoundarySets/Name + '/Set16',uint16)"
+	{ unit<uint16> RunRegions: expr = "RawBoundaryDomains/RunRegions/Set16"; unit<uint16> MozaikRegions: expr = "RawBoundaryDomains/MozaikRegions/Set16"; }
+	
+	container Overlays: expr = "for_each_ind('nex', MetaData/BoundarySets/Name, 'overlay_polygon("
+		"value(BoundaryDomains/'+ MetaData/BoundarySets/Name +'/Geometry, ipoint), "
+		"value(BoundaryDomains/RunRegions/Geometry, ipoint))', uint32)";
+	
+	container RasterSets1k: expr = "for_each_nedvn(MetaData/BoundarySets/Name, 'poly2grid(BoundaryDomains/'+ MetaData/BoundarySets/Name +'/Geometry, Geometries/SelectedTiledRaster1k)', Geometries/SelectedTiledRaster1k, BoundaryDomains, MetaData/BoundarySets/Name)" {
+		attribute<BoundaryDomains/RunRegions> RunRegions (Geometries/SelectedTiledRaster1k): expr = "poly2grid(BoundaryDomains/RunRegions/Geometry, Geometries/SelectedTiledRaster1k)";
+	}
+	container RasterSets1k_16: expr = "for_each_nedvn(MetaData/BoundarySets/Name, 'poly2grid(BoundaryDomains16/'+ MetaData/BoundarySets/Name +'/Geometry, Geometries/SelectedTiledRaster1k)', Geometries/SelectedTiledRaster1k, BoundaryDomains16, MetaData/BoundarySets/Name)" {
+		attribute<BoundaryDomains16/RunRegions> 	RunRegions (Geometries/SelectedTiledRaster1k): expr = "poly2grid(BoundaryDomains16/RunRegions/Geometry, Geometries/SelectedTiledRaster1k)";
+		attribute<BoundaryDomains16/MozaikRegions> 	MozaikRegions (Geometries/SelectedTiledRaster1k): expr = "poly2grid(BoundaryDomains16/MozaikRegions/Geometry, Geometries/SelectedTiledRaster1k)";
+	}
+	
+	Template BoundaryDefinition {
+		
+		parameter<uint32> BoundaryDef;
+		
+		parameter<string> CodeDef: expr = "strlen(MetaData/BoundarySets/ZoneIdDef[BoundaryDef]) > 0 ? MetaData/BoundarySets/ZoneIdDef[BoundaryDef] : quote('z_') + ' + string(id(.))'";
+		
+		unit<uint32> Set32: expr = "= MetaData/BoundarySets/Address[BoundaryDef]", DialogData = "Geometry", DialogType = "Map"
+		{
+			attribute<geometries/BaseProjection> 	Geometry (poly): 	expr = "= MetaData/BoundarySets/Address[BoundaryDef] + '/Geometry'";
+			attribute<string> 						zoneId: 			expr = "= CodeDef";
+			attribute<string>						Label:				expr = "zoneId";
+		}
+		unit<uint16> Set16: expr = "range(uint16, uint16(0), uint16(#Set32))" {
+			attribute<geometries/BaseProjection> 	Geometry (poly): 	expr = "Set32/Geometry[Nr_OrgEntity]";
+			attribute<string> 						ZoneId: 			expr = "Set32/ZoneId[Nr_OrgEntity]";
+			attribute<Set32> 						Nr_OrgEntity: 		expr = "id(.)[Set32]";
+			attribute<string>						Label:				expr = "zoneId";
+		}
+		
+		
+	}
+	
+	Template compileBoundaryReferences
+	{
+		parameter<uint32> RunRegionId;
+		unit<ipoint> domain_1k;
+		
+		container Boundaries: 	expr = "for_each_ne(MetaData/BoundarySets/Name, 'selectBoundaries('+ string(RunRegionId) +','+ string(id(MetaData/BoundarySets)) +')')"
+		{
+			Container RunRegions {
+				unit<uint32> OrgUnitRef: expr = "BaseData/BoundarySets/BoundaryDomains/RunRegions";
+				unit<uint32> SelectedSet: expr = "subset(id(OrgUnitRef) = RunRegionId)"
+				{
+					attribute<geometries/BaseProjection> Geometry (poly): 	expr = "OrgUnitRef/Geometry[Nr_OrgEntity]";
+					attribute<OrgUnitRef>				 OrgRef:			expr = "Nr_OrgEntity";
+					attribute<string> ZoneId: 								expr = "OrgUnitRef/ZoneId[Nr_OrgEntity]";
+				}
+				unit<uint16> SelectedSet16: expr = "range(uint16, uint16(0), uint16(#SelectedSet))"
+				{
+					attribute<geometries/BaseProjection> 	Geometry (poly): 	expr = "SelectedSet/Geometry[Nr_OrgEntity]";
+					attribute<string> 						ZoneId: 			expr = "SelectedSet/ZoneId[Nr_OrgEntity]";
+					attribute<SelectedSet> 					Nr_OrgEntity: 		expr = "id(.)[SelectedSet]";
+					attribute<OrgUnitRef>					OrgRef:				expr = "SelectedSet/Nr_OrgEntity[Nr_OrgEntity]";
+				}
+			}
+		}
+		container UnitSets32: 	expr = "for_each_ind('nex', MetaData/BoundarySets/Name, 'Boundaries/'+ MetaData/BoundarySets/Name + '/SelectedSet',uint32)" 	{unit<uint32> RunRegions: expr = "Boundaries/RunRegions/SelectedSet"; }
+		container UnitSets16: 	expr = "for_each_ind('nex', MetaData/BoundarySets/Name, 'Boundaries/'+ MetaData/BoundarySets/Name + '/SelectedSet16',uint16)" {unit<uint16> RunRegions: expr = "Boundaries/RunRegions/SelectedSet16";	}
+		container RasterSets32:	expr = "for_each_nedv(MetaData/BoundarySets/Name, 'poly2grid(UnitSets32/'+ MetaData/BoundarySets/Name +'/Geometry, domain_1k)', domain_1k, uint32)" {attribute<uint32> RunRegions (domain_1k): expr = "poly2grid(UnitSets32/RunRegions/Geometry, domain_1k)[uint32]";}
+		container RasterSets16: expr = "for_each_nedv(MetaData/BoundarySets/Name, 'RasterSets32/'+ MetaData/BoundarySets/Name +'[UnitSets16/'+MetaData/BoundarySets/Name+']', domain_1k, uint16)"	{attribute<UnitSets16/RuNRegions> RunRegions (domain_1k): expr = "RasterSets32/RunRegions[UnitSets16/RunRegions]";}
+
+		
+	}
+	
+	Template selectBoundaries {
+		parameter<uint32> RunRegionId;
+		parameter<uint32> BoundarySetId;
+			
+		unit<uint32> OrgUnitRef: expr = "= 'BaseData/BoundarySets/BoundaryDomains/'+ MetaData/BoundarySets/Name[BoundarySetId]";
+		unit<uint32> OverlayRef: expr = "= 'BaseData/BoundarySets/Overlays/'+ MetaData/BoundarySets/Name[BoundarySetId]";
+		
+		unit<uint32> SelectedSet: expr = "subset(OverlayRef/second_rel = RunRegionId)"
+		{
+			attribute<geometries/BaseProjection> Geometry (poly): 	expr = "(OverlayRef/Geometry[Nr_OrgEntity])[geometries/BaseProjection]";
+			attribute<OrgUnitRef>				 OrgRef:			expr = "OverlayRef/first_rel[Nr_OrgEntity]";
+			attribute<string> ZoneId: 								expr = "OrgUnitRef/ZoneId[OrgRef]";
+		}
+		unit<uint16> SelectedSet16: expr = "range(uint16, uint16(0), uint16(#SelectedSet))"
+		{
+			attribute<geometries/BaseProjection> 	Geometry (poly): 	expr = "SelectedSet/Geometry[Nr_OrgEntity]";
+			attribute<string> 						ZoneId: 			expr = "SelectedSet/ZoneId[Nr_OrgEntity]";
+			attribute<SelectedSet> 					Nr_OrgEntity: 		expr = "id(.)[SelectedSet]";
+			attribute<OrgUnitRef>					OrgRef:				expr = "SelectedSet/OrgRef[Nr_OrgEntity]";
+		}
+		
+	}
+	
+	
+}

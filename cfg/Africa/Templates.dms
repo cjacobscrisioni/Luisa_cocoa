@@ -1,0 +1,226 @@
+Container Templates 
+{
+	unit<dpoint> BaseProjection  := Geometries/BaseProjection;
+	unit<ipoint> StandardRaster  := geometries/SelectedTiledRaster1k;
+	parameter<string> General_indicator := 'General';
+	
+	Template loadDataFile_poly 
+	{
+		parameter<string> 	inPath;
+		parameter<string> 	ext;
+		unit<ipoint> 		TargetRaster := geometries/SelectedTiledRaster1k;
+		
+		attribute<inFile> RasterIds (TargetRaster): expr = "poly2grid(inFile/Geometry, TargetRaster)";
+		attribute<inFile> CentroidsRaster (TargetRaster): expr = "invert(inFile/CentroidsRaster)";
+		
+		unit<uint32> inFile: StorageName = "= inPath+'.'+ext", StorageType = "gdal.vect", StorageReadOnly = "True"
+		{
+			attribute<BaseProjection>     Geometry (poly);
+			attribute<BaseProjection>	    Centroid        := centroid_or_mid(Geometry);
+			attribute<TargetRaster> CentroidsRaster := Centroid[TargetRaster];
+		}
+	}
+	Template loadDataFile_polyline 
+	{
+		parameter<string> 	inPath;
+		unit<ipoint> 		TargetRaster: expr = "geometries/SelectedTiledRaster1k";
+		
+		attribute<inFile> RasterIds (TargetRaster): expr = "poly2grid(inFile/Geometry, TargetRaster)";
+		//unit<uint32> inFile: StorageName = "= '%AfricaSourceDataDir%/'+inPath+'.shp'", StorageType = "gdal.vect", StorageReadOnly = "True", DialogData = "Geometry", DialogType = "map"
+		unit<uint32> inFile: StorageName = "= inPath+'.shp'", StorageType = "gdal.vect", StorageReadOnly = "True", DialogData = "Geometry", DialogType = "map"
+		{
+			attribute<BaseProjection> Geometry (arc);
+		}
+	}
+	
+	Template loadDataFile_booltiff 
+	{
+		parameter<string> 	inPath;
+		parameter<string> 	Ext;
+		unit<ipoint> 		TargetRaster     := geometries/SelectedTiledRaster;
+		unit<ipoint> 		TargetRaster_10m := geometries/SelectedTiledRaster_10m;
+		unit<ipoint> 		TargetRaster_1k  := geometries/SelectedTiledRaster1k;
+		
+		unit<ipoint>		inFile: StorageName = "= inPath+'.tif'", StorageReadOnly = "True", DialogData = "BaseProjection", DialogType = "map"
+		{
+			attribute<bool> GridData;
+			// attribute<bool> ReadData     (TargetRaster);
+			attribute<bool> ReadData_10m (TargetRaster_10m);
+			// attribute<bool> ReadData_1k  (TargetRaster_1k);
+			
+			attribute<uint8>      Fractie_inTargetRaster    (TargetRaster)   := sum_uint8(ReadData_10m, TargetRaster_10m/SelectedTiledRaster_rel), StorageName = "%LocalDataProjDir%/cocoa_ETH_2022_Fractie_100m_AEA.tif";
+			// attribute<uint8>      Fractie_inTargetRaster_1k (TargetRaster_1k):= sum_uint8(ReadData, TargetRaster/SelectedTiledRaster1k_rel);
+			// attribute<uint8>      Fractie_inTargetRaster_1k (TargetRaster_1k):= sum_uint8(ReadData, TargetRaster/SelectedTiledRaster1k_rel);
+		}
+	}
+	
+	Template loadDataFile_uint8tiff 
+	{
+		parameter<string> 	inPath;
+		parameter<string> 	Ext;
+		unit<ipoint> 		TargetRaster     := geometries/SelectedTiledRaster;
+		unit<ipoint> 		TargetRaster_1k  := geometries/SelectedTiledRaster1k;
+		
+		unit<ipoint>		inFile: StorageName = "= inPath+'.tif'", StorageType = "gdal.grid", StorageReadOnly = "True", DialogData = "BaseProjection", DialogType = "map"
+		{
+			attribute<uint8> GridData;
+			attribute<uint8> ReadData (TargetRaster);
+			attribute<bool> IsCocoa (TargetRaster) := ReadData >= 50b;
+		}
+	}
+	Template loadDataFile_int16tiff 
+	{
+		parameter<string> 	inPath;
+		parameter<string> 	Ext;
+		unit<ipoint> 		TargetRaster: expr = "geometries/SelectedTiledRaster1k";
+		unit<wpoint>		inFile: StorageName = "= inPath+'.tif'", StorageType = "gdal.grid", StorageReadOnly = "True", DialogData = "BaseProjection", DialogType = "map"
+		{
+			attribute<int16> GridData;
+			attribute<int16> ReadData (TargetRaster);
+		}
+	}
+	Template loadDataFile_int32tiff 
+	{
+		parameter<string> 	inPath;
+		parameter<string> 	Ext;
+		unit<ipoint> 		TargetRaster: expr = "geometries/SelectedTiledRaster1k";
+		unit<wpoint>		inFile: StorageName = "= inPath+'.tif'", StorageType = "gdal.grid", StorageReadOnly = "True", DialogData = "BaseProjection", DialogType = "map"
+		{
+			attribute<int32> GridData;
+			attribute<int32> ReadData   (TargetRaster);
+		}
+	}
+	Template loadDataFile_float32tiff 
+	{
+		parameter<string> 	inPath;
+		parameter<string> 	Ext;
+		unit<ipoint> 		TargetRaster: expr = "geometries/SelectedTiledRaster1k";
+		unit<wpoint>		inFile: StorageName = "= inPath+'.tif'", StorageType = "gdal.grid", StorageReadOnly = "True", DialogData = "BaseProjection", DialogType = "map"
+		{
+			attribute<float32> GridData;
+			attribute<float32> ReadData (TargetRaster);
+		}
+	}
+	Template loadDataFile_float64tiff 
+	{
+		parameter<string> 	inPath;
+		parameter<string> 	Ext;
+		unit<ipoint> 		TargetRaster: expr = "geometries/SelectedTiledRaster1k";
+		unit<wpoint>		inFile: StorageName = "= inPath+'.tif'", StorageType = "gdal.grid", StorageReadOnly = "True", DialogData = "BaseProjection", DialogType = "map"
+		{
+			attribute<float64> GridData;
+			attribute<float64> ReadData (TargetRaster);
+		}
+	}
+	Template loadDataFile_csv 
+	{
+		parameter<string> 	inPath;
+		unit<uint32> 	 	TargetUnit: expr = "Geometries/Country";
+		parameter<string> 	ZoneIdField: expr = "'ZoneId'";		
+		parameter<string> 	FieldSeparator := ',';
+		unit<uint32> 		Domain: expr = "range(uint32, 0, #TargetUnit * 2)";
+		
+		parameter<string> 	fssPath: expr = "replace(UpperCase(inPath), '%PROJDIR%', '%LocalDataProjDir%')";
+		
+		parameter<string> FileData:  StorageType = "str",  StorageName = "=inPath+'.csv'";
+		parameter<string> HeaderLine := readLines(FileData, void, 0);
+		parameter<bool>   HeaderOK   := 
+			  regex_match(
+				  HeaderLine
+				 ,'\"[^\"]*+\"(;\"[^\"]*+\")*+'
+			  );
+				
+		unit<uint32> Field:= Range(UInt32, 0, strcount(HeaderLine, FieldSeparator)+1)
+		{attribute<string> Name := ReadArray(HeaderLine, Field, String, 0);}
+				
+		attribute<string> BodyLines(Domain) := readLines(FileData, Domain, HeaderLine/ReadPos); //,  IntegrityCheck = "HeaderOK";
+		attribute<bool> LinesAreSignedIntegerStringOrEmpy (Domain) := 
+			  regex_match(BodyLines,'(-?+[0-9]++|\"[^\"]*+\")?+(;(-?+[0-9]++|\"[^\"]*+\")?+)*+');
+				
+		container Data := for_each_nedv(Field/Name,'ReadElems(BodyLines,string,'+ MakeDefined(Field/Name[sub_or_null(ID(Field),1)]+'/ReadPos','const(0,Domain)')+')',Domain,string);
+		
+		// General Domain modification: if there is a row with, as zone id, the term as specified in General_indicator, the final data takes the general row values if no zone-specific value is found.
+		// Thus, to add any zone-specific exceptions, make a new row in the csv with as zone id the unique zone identifier of that zone. 
+		unit<uint32> General_Domain: expr = "= 'subset(Data/'+ ZoneIdField + ' = General_indicator)'";
+		container General_Data: expr = "for_each_nedv(Field/Name, 'Data/'+Field/Name+'[General_Domain/Nr_OrgEntity]',General_Domain,string)";
+		parameter<bool> General_Domain_Available: expr = "#General_Domain > 0";
+		
+		attribute<Domain> DomainRefField (TargetUnit): expr = "= 'rlookup(trim(UpperCase(TargetUnit/ZoneId)), trim(UpperCase(Data/'+ ZoneIdField +')))'";
+		
+		container DefFile: 	expr = "for_each_nedv(Field/Name, 'IsNull(DomainRefField) && General_Domain_Available ? General_Data/'+Field/Name+'[0] : Data/'+Field/Name+'[DomainRefField]',TargetUnit,string)", KeepData = "True", FreeData = "False";
+		container inFile: 	expr = "= ExistingFile('x:/x',fssPath+Field/Name[0]+'.fss') = 'x:/x' ? 'storeFSS' : 'loadFSS'";
+		container storeFSS: expr = "for_each_nedva(Field/Name, 'DefFile/'+ Field/Name, TargetUnit, string, fssPath + Field/Name + '.fss')";
+		container loadFSS: 	expr = "for_each_ndva(Field/Name, TargetUnit, string, fssPath + Field/Name + '.fss')";
+	}
+	Template TableComposer_uint32
+	{
+	   unit<uint32> context:= ExportDomain;
+	   container RefFields;
+	   parameter<String> FileName       := '%LocalDataProjDir%/dist.csv';
+	   // ExportDomain is a domain unit 
+	   // with two attributes as subitems configured: id & Dist
+	   parameter<String> Fieldlist      := 'id;Dist';
+	   parameter<String> FieldSeparator := ';';
+	   
+
+	   unit<uint32> Field := range(uint32,0,strcount(Fieldlist,';')+1)
+	   {
+		  attribute<string> Name := ReadArray(FieldList,.,string,0);
+	   }
+	   parameter<string> NewLine := '\n';
+	   parameter<String> Header  := FieldList;
+	   attribute<String> Body (context) :=
+		  =AsList(
+			 +'String(RefFields/'+Field/Name+')',' + '+Quote(FieldSeparator)+' +'
+		  );
+	  
+	   parameter<String> Result:= Header + NewLine + AsList(Body, NewLine)
+	   ,  StorageName = "=FileName"
+	   ,  StorageType = "str";
+	}
+	Template TableComposer_uint64
+	{
+	   unit<uint64> context:= ExportDomain;
+	   container RefFields;
+	   parameter<String> FileName       := '%LocalDataProjDir%/dist.csv';
+	   // ExportDomain is a domain unit 
+	   // with two attributes as subitems configured: id & Dist
+	   parameter<String> Fieldlist      := 'id;Dist';
+	   parameter<String> FieldSeparator := ';';
+
+	   unit<uint32> Field := range(uint32,0,strcount(Fieldlist,';')+1)
+	   {
+		  attribute<string> Name := ReadArray(FieldList,.,string,0);
+	   }
+	   parameter<string> NewLine := '\n';
+	   parameter<String> Header  := FieldList;
+	   attribute<String> Body (context) :=
+		  =AsList(
+			 +'String(RefFields/'+Field/Name+')',' + '+Quote(FieldSeparator)+' +'
+		  );
+	  
+	   parameter<String> Result:= Header + NewLine + AsList(Body, NewLine)
+	   ,  StorageName = "=FileName"
+	   ,  StorageType = "str";
+	}
+	Template PrepareSuitabilityRules 
+	{
+		container LoadedSuitabilityFile;
+		parameter<uint32> SelZoneRef;
+		
+		unit<uint32> AllFields:= LoadedSuitabilityFile/Field
+		{
+			attribute<MetaData/AllFactors> FactorRef:= rlookup(trim(uppercase(Name)), trim(uppercase(MetaData/AllFactors/Name)));
+		}
+		unit<uint32> RelevantFields:= subset(!IsNull(AllFields/FactorRef)) 
+		{
+			attribute<string>              Name       := AllFields/Name[Nr_OrgEntity];
+			attribute<MetaData/AllFactors> FactorRef  := AllFields/FactorRef[Nr_OrgEntity];
+			attribute<string>              FactorDef  := 'float32('+ MetaData/AllFactors/Ref[FactorRef] +')';
+			attribute<string> 			   FactorUnit := replace(MetaData/AllFactors/Ref[FactorRef], const('/',.,string)+Name, '');
+			attribute<float32>             FactorVal  := = 'union_data(., '+AsItemList('float32(LoadedSuitabilityFile/inFile/'+ Name +'[SelZoneRef])')+')';
+			attribute<string>              Rule       := '('+string(FactorVal)+'f * ' + FactorDef + ')';
+		}
+		parameter<string> EvalSuitability:  = 'add('+AsItemList(RelevantFields/Rule)+')';
+	}
+}

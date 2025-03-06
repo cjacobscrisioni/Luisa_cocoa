@@ -1,0 +1,217 @@
+container GHA_calibration: Using = "Classifications;Geometries;" {
+	
+	parameter<float32> revenue:= 1000f;
+	parameter<float32> max_cost:= 500f;
+	
+	unit<uint32> samples: nrofrows = 10000 {
+		attribute<string> LabelText:= 's_'+string(id(.));
+		attribute<uint32> seed:= id(.);
+	}
+	
+	unit<uint8> ModelType:= subset(id(Classifications/ActiveModelTypes) < 4b || id(Classifications/ActiveModelTypes) == 7b) {
+		attribute<string> Name:= Classifications/ActiveModelTypes/Name[Nr_OrgEntity];
+		attribute<string>  			Label: 			expr = "Name", DialogType = "LabelText";
+		attribute<uint32>   		Color: 			expr = "Classifications/ActiveModelTypes/Color[Nr_OrgEntity]", DialogType = "BrushColor";
+	}
+	
+	unit<uint32> indistricts: StorageName = "%SourceDataDir%/Africa/GHA_calibration/district/Map_of_Districts_216_Albers.shp", StorageType = "gdal.vect", StorageReadOnly = "True" {
+		attribute<AfricanACEA> Geometry (poly);
+	}
+	
+	container create_rasters {
+		parameter<BaseProjection> BP_LB := lower_bound(StudyArea/Geometry[uint16(0)]);
+		parameter<BaseProjection> BP_UB := upper_bound(StudyArea/Geometry[uint16(0)]);
+		parameter<SelectedTiledRaster> ST_LB := BP_LB[SelectedTiledRaster];
+		parameter<SelectedTiledRaster> ST_UB := BP_UB[SelectedTiledRaster] + Point(1i, 1i);
+		parameter<SelectedTiledRaster1k> ST_LB1k := BP_LB[SelectedTiledRaster1k];
+		parameter<SelectedTiledRaster1k> ST_UB1k := BP_UB[SelectedTiledRaster1k] + Point(1i, 1i);
+	}
+	unit<ipoint> study_100m:= range(SelectedTiledRaster, create_rasters/ST_LB, create_rasters/ST_UB), DialogData = "BaseProjection" {
+		attribute<Copernicus> LU:= Copernicus_EK/Class[BaseData/Landuse/PerCountryGroup/calib_LU];
+	}
+	unit<ipoint> study_1km:= SelectedTiledRaster1k {
+		attribute<PerCountryGroup/GHA/domain_1k> GHA_raster_id:= id(.)[PerCountryGroup/GHA/domain_1k];
+		attribute<PerCountryGroup/GHA/AllocDomain> GHA_domain_id:= PerCountryGroup/GHA/AllocDomain/BaseGrid[GHA_raster_id];
+		attribute<StudyArea> RunRegions:= poly2grid(StudyArea/Geometry, .);
+		attribute<export_1km> exp_rel:= id(.)[export_1km];
+		container suitabilities:= for_each_nedv(ModelType/Name, 'PerCountryGroup/GHA/ModelIterations/y2020/LandUseAllocation/SuitabilityLogit/'+ModelType/Name+'[GHA_domain_id]', study_1km, float32);
+	}
+	
+	unit<ipoint> export_1km:= range(SelectedTiledRaster1k, create_rasters/ST_LB1k, create_rasters/ST_UB1k), DialogData = "BaseProjection" {
+		attribute<study_1km> s1k_id:= id(.)[study_1km];
+	}
+	
+	unit<uint8> RegionRef8: NrOfRows = 1 {attribute<string> Name:= const('StudyArea',.,string);}
+	unit<ipoint> RasterSets16:= study_1km {
+		attribute<GHA_calibration/StudyArea> StudyArea:= RunRegions;
+	}
+	
+	unit<uint16> StudyArea: nrofrows = 1 {
+		attribute<indistricts> dist_ref:= const(6,.,uint32);
+		attribute<AfricanACEA> Geometry (poly):= indistricts/Geometry[dist_ref];
+		attribute<float32>	   km2:= float32(pcount(study_1km/RunRegions));
+	}
+	
+	unit<uint64> Domain := subset(IsDefined(study_1km/RunRegions)), DialogType = "Map", DialogData = "BaseGrid" 
+	{
+		attribute<Domain> permutation            := rnd_permutation(0, Domain);
+		attribute<study_1km>   grid_rel (Domain) := lookup(permutation, nr_OrgEntity);
+		attribute<export_1km> exp_rel	(Domain) := study_1km/exp_rel[grid_rel];
+		attribute<Domain> BaseGrid (study_1km)   := invert(grid_rel);
+		attribute<Domain> ExportGrid (export_1km):= invert(exp_rel);
+	}
+	container RegionSets16 {
+		unit<uint16> StudyArea:= GHA_calibration/StudyArea;
+	}
+	container RegionMaps:= for_each_nedvn(RegionRef8/Name, 'invert(id(GHA_calibration/'+ RegionRef8/Name +'))[RasterSets16/'+ RegionRef8/Name +'[Domain/grid_rel]]', Domain, RegionSets16, RegionRef8/Name);
+			
+	unit<uint16> AtomicRegions := overlay(RegionRef8/Name, Domain, RegionMaps), DialogData = "UnionData", DialogType = "map"
+	{
+		attribute<AtomicRegions> UnionData(Domain);
+		attribute<uint32> 		 Recs: 					= uint32(Pcount(UnionData));
+		attribute<AtomicRegions> ID: 					= ID(AtomicRegions);
+		attribute<bool>			 error (Domain): 	= IsNull(UnionData);
+	}
+
+	Container FeasibleSolution;
+	
+	container StoreSuitabilities:= for_each_nedva(ModelType/Name, 'study_1km/suitabilities/'+ModelType/Name+'[export_1km/s1k_id]', export_1km, float32, '%LocalDataProjDir%/gha_calibration/suitability_grids/'+ModelType/Name+'.tif');
+	container LoadSuitabilities:= for_each_ndva(ModelType/Name, export_1km, float32, '%LocalDataProjDir%/gha_calibration/suitability_grids/'+ModelType/Name+'.tif');
+	container Revenues:= for_each_nedv(ModelType/Name, 'round(LoadSuitabilities/'+ModelType/Name+'[domain/exp_rel] * revenue * RevenueModifiers/'+ModelType/Name+')', Domain, int32);
+	
+	container MinClaims_2002:= for_each_nedv(ModelType/Name, 'max_elem(sum(uint32(id(ModelType) == '+string(id(ModelType))+'[ModelType]) * transitioncount/area_2002, transitioncount/sa_id) - 1, 0)', StudyArea, uint32);
+	container MaxClaims_2002:= for_each_nedv(ModelType/Name, 'sum(uint32(id(ModelType) == '+string(id(ModelType))+'[ModelType]) * transitioncount/area_2002, transitioncount/sa_id)', StudyArea, uint32);
+	container MinClaims_2020:= for_each_nedv(ModelType/Name, id(ModelType) = 0b ? 'Claims_2020/Urban' : 'const(0,StudyArea,uint32)', StudyArea, uint32);
+	container MaxClaims_2020:= for_each_nedv(ModelType/Name, id(ModelType) = 0b ? 'Claims_2020/Urban' : 'const('+string(#Domain)+',StudyArea,uint32)', StudyArea, uint32);
+	container Claims_2020:= for_each_nedv(ModelType/Name, 'sum(uint32(id(ModelType) == '+string(id(ModelType))+'[ModelType]) * transitioncount/area_2020, transitioncount/sa_id)', StudyArea, uint32) {
+		attribute<uint32> s_mt (ModelType):= = 'union_data(ModelType, '+asItemList('sum('+ModelType/Name+')')+')';
+	}
+	
+	container d_alloc_2002: expr = 
+				"discrete_alloc(ModelType/Name, Domain, Revenues, const(0b,ModelType,RegionRef8), RegionRef8/Name, AtomicRegions, AtomicRegions/UnionData, MinClaims_2002, MaxClaims_2002, int32(-100), FeasibleSolution)"
+			{ attribute<ModelType> landuse (domain); attribute<ModelType> storelu (export_1km):= landuse[Domain/ExportGrid], StorageName = "%localdataprojdir%/gha_calibration/alloc_grids/base.tif";}
+	
+	unit<uint32> transition_matrix:= combine(ModelType, ModelType) {
+		attribute<upoint> 	pt_id:= point(uint32(first_rel), uint32(second_rel), upoint);
+		attribute<string> 	LabelText:= ModelType/Name[first_rel]+'_to_'+ModelType/Name[second_rel];
+		attribute<bool>		from_urb:= first_rel == 0b;
+		attribute<float32>	urb_modifier:= from_urb ? 2f : 1f;
+		attribute<float32>	diag_modifier:= first_rel == second_rel ? -1f : 1f;
+		attribute<float32> 	basecost:= urb_modifier * diag_modifier * max_cost;
+		attribute<float32>	observed_transitions_ha:= float32(transitioncount/size[rlookup(pt_id, transitioncount/pt_id)]);
+		attribute<float32>	observed_transitions:= (observed_transitions_ha / sum(observed_transitions_ha)) * float32(#Domain);
+	}
+	
+	attribute<ModelType> load_lu 	(export_1km): StorageName = "%localdataprojdir%/gha_calibration/alloc_grids/base.tif", storagereadonly = "True";
+	attribute<ModelType> loaded_lu 	(Domain):=	load_lu[Domain/exp_rel];
+	
+	attribute<float32>	 Random 	(Domain) := rnd_uniform(0, Domain, range(float32, 0f, 5f));
+	attribute<float32>   Age_LU     (Domain) := loaded_lu == Classifications/ActiveModelTypes/ParamConstants/Cocoa ? Classifications/cocoa_age_class/min_age[classify(Random, Classifications/cocoa_age_class/rel_cumu_break * 5f)] + Random : Random * 10f;			
+	attribute<float32>   ln_Age_LU  (Domain) := log(Age_LU + 0.01f);			
+	attribute<float32> 	 Constant	(Domain) := const(1f,Domain,float32);
+	
+	container RevenueModifiers {
+		attribute<float32> Urban (Domain):= const(1f,Domain,float32);
+		attribute<float32> Crops (Domain):= const(1f,Domain,float32);
+		attribute<float32> PermanentCrops (Domain):= const(1f,Domain,float32);
+		attribute<float32> MatureForest (Domain):= const(1f,Domain,float32);
+		attribute<float32> Cocoa (Domain):= Classifications/cocoa_tree_age/perc_npv_yield[classify((loaded_lu = 4[ModelType] ? Age_LU : 1f), Classifications/cocoa_tree_age/age)];
+	}
+
+	container Runsamples:= for_each_ne(samples/LabelText, 'doSample('+string(id(samples))+')') {
+		unit<uint32> run_all:= samples {
+			attribute<bool> button:= = 'union_data(., '+asItemList(LabelText+'/run')+')';
+			attribute<int32>abs_err:= = 'union_data(., '+asItemList(LabelText+'/abs_err')+')';
+			
+		}
+	}
+	
+	Template doSample {
+		parameter<samples> inSample;
+		
+		unit<uint32> sample_transition_matrix:= transition_matrix {
+			attribute<float32> 	random 	(transition_matrix):= rnd_uniform(inSample, transition_matrix, range(float32,0.01f, 1f));
+			attribute<float32>	cost   	(transition_matrix):= transition_matrix/from_urb ? basecost : basecost * random;
+			
+			container costs_to_lu:= for_each_nedv(ModelType/Name, 'sum(cost * float32(second_rel == '+string(id(ModelType))+'b), first_rel)', ModelType, float32);
+		}
+		container costsgrids:= for_each_nedv(ModelType/Name, 'sample_transition_matrix/costs_to_lu/'+ModelType/Name+'[loaded_lu]', Domain, float32);
+		container Transpots:= for_each_nedv(ModelType/Name, 'Revenues/'+ModelType/Name+' - round(costsgrids/'+ModelType/Name+')', Domain, int32);
+		
+		Container FeasibleSolution;
+
+		container sample_alloc: expr = 
+				"discrete_alloc(ModelType/Name, Domain, Transpots, const(0b,ModelType,RegionRef8), RegionRef8/Name, AtomicRegions, AtomicRegions/UnionData, MinClaims_2020, MaxClaims_2020, int32(-5000), FeasibleSolution)"
+			{ attribute<ModelType> landuse (domain); attribute<ModelType> storelu (export_1km):= landuse[Domain/ExportGrid], StorageName = "= '%localdataprojdir%/gha_calibration/alloc_grids/'+samples/LabelText[inSample]+'.tif'";}
+		
+		attribute<ModelType> load_sample_lu 	(export_1km): StorageName = "= PropValue(sample_alloc/storelu, 'StorageName')", storagereadonly = "True";
+		attribute<ModelType> sample_lu 			(Domain):=	load_sample_lu[Domain/exp_rel];
+		
+		attribute<transition_matrix> mod_transitions_id (Domain):= rlookup(point(uint32(loaded_lu), uint32(sample_lu), upoint), transition_matrix/pt_id);
+		attribute<uint64>	modelled_transitions (transition_matrix):= pcount(mod_transitions_id);
+		attribute<int32>	transition_err (transition_matrix):= int32(!transition_matrix/from_urb) * (int32(modelled_transitions) - round(transition_matrix/observed_transitions));
+		parameter<int32>	abs_err:= sum(Abs(transition_err));
+		attribute<int32>	abs_err_fmt (ModelType):= sum(Abs(transition_err), transition_matrix/first_rel);
+		attribute<int32>	abs_err_tmt (ModelType):= sum(Abs(transition_err), transition_matrix/second_rel);
+		attribute<uint64>	tot_alloc_mt(ModelType):= pcount(load_sample_lu);
+		attribute<float32>	rel_err_tmt (ModelType):= sum(float32(transition_err), transition_matrix/second_rel) / float32(tot_alloc_mt);
+		
+		
+		parameter<bool> run:= True, explicitsuppliers = "sample_alloc/storelu";
+		
+		
+	}
+	
+	
+	
+	
+	
+	unit<uint32> transitioncount: nrofrows = 25 {
+		
+		attribute<ModelType> from:= rlookup(indata/data[((id(.)*3)+0)[indata]], ModelType/Name);
+		attribute<ModelType> to:= 	rlookup(indata/data[((id(.)*3)+1)[indata]], ModelType/Name);
+		attribute<uint32> 	 size:= uint32(indata/data [((id(.)*3)+2)[indata]]);
+		attribute<upoint> 	pt_id:= point(uint32(from), uint32(to), upoint);
+		
+		attribute<float32> 		in_area_2002 (ModelType):= float32(sum(size, from));
+		attribute<float32> 		in_area_2020 (ModelType):= float32(sum(size, to));
+		attribute<uint32>		area_2002	 (ModelType):= round(float32(in_area_2002 / sum(in_area_2002)) * StudyArea/km2[sa_id])[uint32];
+		attribute<uint32>		area_2020	 (ModelType):= round((in_area_2020 / sum(in_area_2020)) * StudyArea/km2[sa_id])[uint32];
+		attribute<StudyArea>	sa_id	  (ModelType):= const(0,ModelType,StudyArea);
+		
+		unit<uint32> indata: nrofrows = 75 {
+			attribute<string> data: [
+				// transitions in East Wassa according to Loh et al (2022)
+				// Loh, S.K.; Asubonteng, K.O.; Adanu, S.K. Effects of Monocropping on Land Cover Transitions in theWet Evergreen Agro-Ecological Zone of Ghana. Land 2022, 11, 1063. https://doi.org/10.3390/land11071063
+				// reclassified by Chris Jacobs-Crisioni, JRC B3, to fit modeltypes
+				//	From,			To,				Nr
+				'MatureForest', 	'MatureForest', 	'807633',
+				'MatureForest', 	'Cocoa', 			'185147',
+				'MatureForest', 	'PermanentCrops', 	'145785',
+				'MatureForest', 	'Crops', 			'9563',
+				'MatureForest', 	'Urban', 			'3498',
+				'Cocoa', 			'MatureForest', 	'20099',
+				'Cocoa', 			'Cocoa', 			'102477',
+				'Cocoa', 			'PermanentCrops', 	'41656',
+				'Cocoa', 			'Crops', 			'8026',
+				'Cocoa', 			'Urban',			'1033',
+				'PermanentCrops', 	'MatureForest', 	'4855',
+				'PermanentCrops', 	'Cocoa', 			'36280',
+				'PermanentCrops', 	'PermanentCrops',	'23049',
+				'PermanentCrops', 	'Crops', 			'4708',
+				'PermanentCrops', 	'Urban', 			'711',
+				'Crops', 			'MatureForest', 	'503',
+				'Crops', 			'Cocoa', 			'7363',
+				'Crops', 			'PermanentCrops', 	'6276',
+				'Crops', 			'Crops', 			'3348',
+				'Crops', 			'Urban', 			'2697',
+				'Urban', 			'MatureForest', 	'1693',
+				'Urban', 			'Cocoa', 			'1351',
+				'Urban', 			'PermanentCrops', 	'433',
+				'Urban', 			'Crops', 			'745',
+				'Urban', 			'Urban', 			'4188'];
+		}
+		
+		
+	}
+}

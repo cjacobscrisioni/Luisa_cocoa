@@ -1,0 +1,370 @@
+container ModelIterationSchemes {
+	Template ModelT {
+
+		unit<uint64> Domain;
+		unit<ipoint> domain_1k;
+		unit<uint8> ModelType;
+		unit<uint8> ViewType;
+		container ModellingRules;
+		parameter<MetaData/Periods> PeriodId;
+		
+		Container PrevState: 			expr = "= 'ModelIterations/' + MetaData/Periods/sYear[PeriodId - 1[MetaData/Periods]] + '/ResultingState'";
+		Container Context: 				expr = "VariablePreparationT(domain_1k, ModelType, PrevState, ModelClaimRegions/Urban, ModelClaimRegions/Crops)";
+		unit<uint8> RegionRef8:			expr = "ModellingRules/RegionRef8";
+		Container ModelClaimRegions:	expr = "for_each_ind('nex', ModelType/Name, MakeDefined('Boundaries/UnitSets16/'+ModelType/ModelClaimDef, 'Boundaries/UnitSets16/Countries'), uint16)";
+		Container ModelClaimRasters:	expr = "for_each_nedvn(ModelType/Name, MakeDefined('ClaimRasters/'+ModelType/ModelClaimDef, 'ClaimRasters/Countries'), domain_1k, ClaimRegions, MakeDefined(ModelType/ModelClaimDef, 'Countries'))";
+		Container ClaimRegions:			expr = "for_each_ind('nex', RegionRef8/Name, 'Boundaries/UnitSets16/'+RegionRef8/Name, uint16)";
+		Container ClaimRasters:			expr = "for_each_nedvn(RegionRef8/Name, 'Boundaries/RasterSets16/'+RegionRef8/Name, domain_1k, ClaimRegions, RegionRef8/Name)";
+		Container Demographics:			expr = "DemographicsT(domain_1k, 	ModelClaimRegions/Urban, ModelClaimRasters/Urban)";
+		Container Economy:				expr = "EconomyT(Demographics,		ModelClaimRegions/Urban)";
+		Container HousingStock:			expr = "HousingStockT(Domain, 		ModelClaimRegions/Urban, ModelClaimRasters/Urban[Domain/grid_rel])";
+		Container PopulationPressure: 	expr = "PopulationPressureT(Domain,	ModelClaimRegions/Urban, ModelClaimRasters/Urban[Domain/grid_rel])";	
+		Container LandUseAllocation {
+			Container Claims {
+				unit<uint16> UrbanProjectionZones: 			expr = "ModelClaimRegions/Urban";
+				unit<uint16> CropsProjectionZones:			expr = "ModelClaimRegions/Crops";
+				unit<uint16> PermanentCropsProjectionZones:	expr = "ModelClaimRegions/PermanentCrops";
+				unit<uint16> ForestProjectionZones:			expr = "ModelClaimRegions/YoungForest";
+				
+				parameter<float32>	sum_yield_in_15y:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * MakeDefined(Classifications/cocoa_tree_age/npv_yield[classify(float32(PrevState/cocoa_age) + 15f, Classifications/cocoa_tree_age/age)], 0f));
+				parameter<float32>  add_yield_needed:= max_elem(ModelIterations/y2015/ResultingState/Cocoa_Yield_15y - sum_yield_in_15y, 0f);
+				parameter<float32> 	cocoa_km_min_needed:= add_yield_needed > 0f ? sum(float32(PrevState/LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa)) + (add_yield_needed / (PrevState/avg_cocoa_suit * Classifications/cocoa_tree_age/npv_yield[14[Classifications/cocoa_tree_age]])) : 0f;
+				
+				attribute<float32>	projAgri2015	(CropsProjectionZones):				expr = "= 'float32(RunSettings/AgricultureProjections/inFile/y2015[ClaimRegions/'+ModelType/ModelClaimDef[1b]+'/OrgRef])'";
+				attribute<float32>	projAgriNow		(CropsProjectionZones): 			expr = "= 'float32(RunSettings/AgricultureProjections/inFile/'+MetaData/Periods/sYear[PeriodId]+'[ClaimRegions/'+ModelType/ModelClaimDef[1b]+'/OrgRef])'";
+				attribute<float32> 	AgriClaim		(CropsProjectionZones):				expr = "MakeDefined(projAgriNow / projAgri2015, 1f) * (Context/RegionalFactors/nAgric)";
+
+				attribute<float32>	projCocoa2015	(CropsProjectionZones):				expr = "= 'float32(RunSettings/CocoaProjections/inFile/y2015[ClaimRegions/'+ModelType/ModelClaimDef[7b]+'/OrgRef])'";
+				attribute<float32>	projCocoaNow	(CropsProjectionZones): 			expr = "= 'float32(RunSettings/CocoaProjections/inFile/'+MetaData/Periods/sYear[PeriodId]+'[ClaimRegions/'+ModelType/ModelClaimDef[7b]+'/OrgRef])'";
+				attribute<float32> 	CocoaClaim		(CropsProjectionZones):				expr = "MakeDefined(projCocoaNow / projCocoa2015, 1f) * (Context/RegionalFactors/nCocoa)";
+				
+				attribute<float32>  ln_fdDens		(UrbanProjectionZones):				expr = "= ModellingRules/GenSuitabilityRules/UrbanDensity/EvalSuitability";
+				attribute<float32>	fdDens			(UrbanProjectionZones): 			expr = "= 'float32(exp('+ModellingRules/GenSuitabilityRules/UrbanDensity/EvalSuitability+'))'";
+				attribute<float32> 	cUrban 			(UrbanProjectionZones): 			expr = "= 'Demographics/ProjectedTotals/Population/Summed / (Context/RegionalFactors/prevdens * (float32(1) + ((fdDens - float32(1)) * MetaData/Periods/Duration_densmodel[PeriodId])))'";// + ' * Demographics/ProjectedTotals/Population/summed'";
+				attribute<float32>	tCrops			(CropsProjectionZones):				expr = "Context/RegionalFactors/pCrops * AgriClaim";
+				attribute<uint32> 	cCrops 			(CropsProjectionZones): 			expr = "uint32(round(Context/RegionalFactors/pCrops * (AgriClaim)))";
+				attribute<uint32>	cPermanentCrops (PermanentCropsProjectionZones):	expr = "uint32(round(Context/RegionalFactors/pPermanentCrops * (AgriClaim)))";
+				attribute<float32>	cYoungForest	(ForestProjectionZones):			expr = "= 'float32('+ModellingRules/GenSuitabilityRules/MaxYoungForest/EvalSuitability+')'";
+				attribute<float32>	cMatureForest	(ForestProjectionZones):			expr = "= 'float32('+ModellingRules/GenSuitabilityRules/MinMatureForest/EvalSuitability+')'";
+				
+				container min: expr = "for_each_nedv(isNull(ModelType/ModelClaimDef) ? ModelType/Name : '', 'const(0,ClaimRegions/Countries,uint32)', ClaimRegions/Countries, uint32)" {
+					attribute<uint32> 	Crops 			(CropsProjectionZones): 	expr = "!RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] ? (90 * cCrops) / 100 : 0";
+					//attribute<uint32> 	PermanentCrops 	(CropsProjectionZones): 	expr = "!RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] ? (90 * cPermanentCrops) / 100 : 0";
+					attribute<uint32> 	PermanentCrops 	(CropsProjectionZones): 	expr = "(90 * cPermanentCrops) / 100";
+					attribute<uint32> 	Cocoa 			(CropsProjectionZones): 	expr = "!RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] ? MakeDefined(sub_or_null(uint32(CocoaClaim), 1), 0) : MakeDefined(uint32(ScaleSum(sum(float32(PrevState/LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa), ModelClaimRasters/Cocoa), cocoa_km_min_needed)), 0)";
+					attribute<uint32> 	Urban			(UrbanProjectionZones): 	expr = "MakeDefined(sub_or_null(uint32(cUrban), 1), 0)";
+					attribute<uint32>	YoungForest		(ForestProjectionZones):	expr = "sum(uint32(PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/YoungForest), ModelClaimRasters/YoungForest)";
+					attribute<uint32>	MatureForest	(ForestProjectionZones):	expr = "min_elem(uint32(round(sum(float32(PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/MatureForest), ModelClaimRasters/MatureForest) + cMatureForest)), 0)";
+				}
+				container max: expr = "for_each_nedv(isNull(ModelType/ModelClaimDef) ? ModelType/Name : '', 'const(uint32(#domain),ClaimRegions/Countries,uint32)', ClaimRegions/Countries, uint32)" {
+					attribute<uint32> 	Crops 			(CropsProjectionZones): 	expr = "!RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] ? (111 * cCrops) / 100 : 99999";
+					//attribute<uint32> 	PermanentCrops 	(CropsProjectionZones):	 	expr = "!RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] ? (111 * cPermanentCrops) / 100 : 99999";
+					attribute<uint32> 	PermanentCrops 	(CropsProjectionZones):	 	expr = "(111 * cPermanentCrops) / 100";
+					attribute<uint32> 	Cocoa 			(CropsProjectionZones):	 	expr = "!RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] ? uint32(CocoaClaim)+1 : 99999";
+					attribute<uint32> 	Urban			(UrbanProjectionZones): 	expr = "uint32(cUrban) + 1";
+					attribute<uint32>	YoungForest		(ForestProjectionZones):	expr = "uint32(round(sum(float32(PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/YoungForest), ModelClaimRasters/YoungForest) + cYoungForest))";
+					attribute<uint32>	MatureForest	(ForestProjectionZones):	expr = "sum(uint32(PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/MatureForest), ModelClaimRasters/MatureForest)";
+				}
+			}
+			container TransitionCosts:			expr = "for_each_nedv(ModelType/name, 'float32(rjoin(point(uint32(PrevState/LandUse[domain/grid_rel]), const('+string(id(ModelType))+',domain, uint32), upoint), Classifications/ModelledTransitions/PointRef, ModellingRules/TransitionCosts/inFile/Cost))', domain, float32)";
+			container TransitionCostModifiers:  expr = "= 'for_each_nedv(ModelType/name, ModellingRules/GenTransitionCostModifierRules/SuitEvalRef, Domain, float32)'"; 
+			container RevenueModifiers:  		expr = "for_each_nedv(ModelType/name, ModelType/Name = 'Cocoa' ? '(Classifications/cocoa_tree_age/perc_npv_yield[classify((PrevState/landuse == 7[ModelType] ? Context/DynamicGridFactors/Age_LU : 1f), Classifications/cocoa_tree_age/age)])[domain/grid_rel]' : 'const(1f,Domain,float32)', Domain, float32)"; 
+			container EmpiricalSuitabilities: 	expr = "= 'for_each_nedv(ModelType/name, ModellingRules/GenSuitabilityRules/SuitEvalRef, Domain, float32)'" {
+				attribute<domain_1k>  	grid_rel 	(Domain): Expr = "Domain/grid_rel";
+				attribute<float32> 		Summed 		(Domain): expr = "= 'add('+ AsItemList(ModelType/Name) +')'";
+			}
+			//container Probabilities:	expr = "for_each_nedv(ModelType/Name, 'float32(1) / (EmpiricalSuitabilities/'+ModelType/Name+' / PercentileValues/'+ModelType/Name, domain, float32)";
+			container protoSuitabilityLogit:	expr = "for_each_nedv(ModelType/Name, ModelType/Name = 'Urban' ? 'EmpiricalSuitabilities/Urban' : 'exp(EmpiricalSuitabilities/'+ModelType/Name+') / (float32(1) + exp(EmpiricalSuitabilities/'+ModelType/Name+'))', domain, float32)";
+			//container SuitabilityLogit:			expr = "for_each_nedv(ModelType/Name, 'MakeDefined(protoSuitabilityLogit/'+ModelType/Name+' / nth_element(protoSuitabilityLogit/'+ModelType/Name+', (95 * #domain) / 100), float32(0))', domain, float32)";
+			container SuitabilityLogit:			expr = "for_each_nedv(ModelType/Name, 'MakeDefined(protoSuitabilityLogit/'+ModelType/Name+' / max(protoSuitabilityLogit/'+ModelType/Name+'), float32(0))', domain, float32)";
+			container Suitability_x_RevenueModifier:= for_each_nedv(ModelType/Name, '(SuitabilityLogit/'+ModelType/Name+' * RevenueModifiers/'+ModelType/Name+')[domain/BaseGrid]' + (ModelType/Name = 'Cocoa' ? ' / 1000f' : ''), domain_1k, float32);
+			container TransitionPotential:		expr = "for_each_nedv(ModelType/Name, (id(ModelType) = ModelType/ParamConstants/Cocoa ? 'context/DynamicGridFactors/Cocoa_protect[domain/grid_rel] > 0f ? int32(-9999) : ' : '') + 'int32((SuitabilityLogit/'+ModelType/Name+' * ModellingRules/RegionalRevenueModifiers/'+ModelType/Name+'[ClaimRasters/Ghana_Regions_old10[Domain/grid_rel]] * RevenueModifiers/'+ModelType/Name+') - (TransitionCosts/'+ModelType/Name+' * TransitionCostModifiers/'+ModelType/Name+'))', domain, int32)";
+			container StoreSuitabilityLogits:= for_each_nedva(ModelType/Name, 'SuitabilityLogit/'+ModelType/Name+'[domain/BaseGrid]', domain_1k, float32, '%LocalDataProjDir%/store_suitabilities/'+MetaData/Periods/sYear[PeriodId]+'/'+ModelType/Name+'.tif');
+			container FeasibleSolution;
+			
+			// currently: minimum transitionpotential set quite low (same as in LUISA though)
+			container d_alloc: expr = 
+				"discrete_alloc(ModelType/Name, domain, TransitionPotential, rlookup(MakeDefined(ModelType/ModelClaimDef, 'Countries'), RegionRef8/Name), RegionRef8/Name, ModellingRules/AtomicRegions, ModellingRules/AtomicRegions/UnionData, Claims/min, Claims/max, int32(-100), FeasibleSolution)"
+			{ attribute<ModelType> landuse (domain); }
+			parameter<bool> cumulStatusFlag: 				expr = "and(PrevState/LandUseAllocation/cumulStatusFlag, d_alloc/statusFlag)";
+		}
+		Container PopulationDistribution: 	expr = "PopulationDistributionT(Domain,	ModelClaimRegions/Urban, ModelClaimRasters/Urban[Domain/grid_rel])";
+		Container ResultingState {
+			attribute<float32> 	Age_LU	 (domain_1k): 		expr = "LandUseAllocation/d_alloc/landuse[domain/BaseGrid] = PrevState/LandUse ? PrevState/Age_LU + float32(Metadata/Periods/duration[PeriodId]) : 0f";
+			attribute<ModelType> LandUse (domain_1k): 		expr = "Age_LU > MetaData/YoungForestMatures && LandUseAllocation/d_alloc/landuse[domain/BaseGrid] = ModelType/ParamConstants/YoungForest ? const(ModelType/ParamConstants/MatureForest, domain_1k, ModelType) : LandUseAllocation/d_alloc/landuse[domain/BaseGrid]", IntegrityCheck = "LandUseAllocation/cumulStatusFlag";
+			attribute<ViewType>  LandUseVT(domain_1k) : 	expr = "MakeDefined(ModelType/Nr_OrgEntity[LandUse], VariablePreparation/LandUseVT)";
+			attribute<float32>   NewUrban(domain_1k):		expr = "float32(LandUse = ModelType/ParamConstants/Urban && !Context/DynamicGridFactors/is_Urban)";
+			attribute<float32>	 Si		 (domain_1k): 		expr = "HousingStock/Si[domain/BaseGrid]";
+			attribute<float32>	 Age_Si	 (domain_1k): 		expr = "HousingStock/Age_Si[domain/BaseGrid]";
+			attribute<float32>	 Qi		 (domain_1k): 		expr = "PopulationDistribution/Qi[domain/BaseGrid]";
+			attribute<Classifications/cocoa_tree_age> cocoa_age (domain_1k):= LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa ? classify(Age_LU, Classifications/cocoa_tree_age/Age) : const(0 / 0, domain_1k, Classifications/cocoa_tree_age);
+			parameter<float32>   cocoa_yield:= sum(Context/StaticGridFactors/perc_cocoa_climate_suit * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)]));
+			parameter<float32>	 avg_cocoa_suit:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa)) / sum(float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa));
+			
+			container Economy:			expr = "../Economy";
+			container Context:			expr = "../Context";
+			container RegionalFactors:	expr = "Context/RegionalFactors";
+			container LandUseAllocation:expr = "../LandUseAllocation";
+			parameter<bool>	cumu_store:= True, explicitsuppliers = "ExportResults/store;PrevState/cumu_store";
+		}
+		Container ChangeMaps: 	 expr = "for_each_nedv(ModelType/Name, 'switch('+"
+			"'case(VariablePreparation/LandUse <> ModelType/ParamConstants/'+ModelType/Name+' && ResultingState/LandUse <> ModelType/ParamConstants/'+ModelType/Name+', 0[Classifications/Change]),'+"
+			"'case(VariablePreparation/LandUse = ModelType/ParamConstants/'+ModelType/Name+' && ResultingState/LandUse = ModelType/ParamConstants/'+ModelType/Name+', 	1[Classifications/Change]),'+"
+			"'case(VariablePreparation/LandUse <> ModelType/ParamConstants/'+ModelType/Name+' && ResultingState/LandUse = ModelType/ParamConstants/'+ModelType/Name+', 	2[Classifications/Change]),'+"
+			"'case(VariablePreparation/LandUse = ModelType/ParamConstants/'+ModelType/Name+' && ResultingState/LandUse <> ModelType/ParamConstants/'+ModelType/Name+', 	3[Classifications/Change]),'+"
+			"' 0[Classifications/Change])', domain_1k, Classifications/Change)" {
+				attribute<float32> Qi (domain_1k): expr = "ResultingState/Qi - y2015/ResultingState/Qi";
+		}	
+			
+			
+			
+		Container ExportResults: expr = "ExportResultsT(domain_1k, ViewType)";
+		// Africa specific code, awaiting feedback from VU University for correct specification of Y in population regressions, then possibly change PopulationPressureT code.
+		/* = ""
+		Container PopulationPressure: using = "Domain" {
+			attribute<float32> Qi	(Domain): expr = "Context/DynamicGridFactors/Qi[grid_rel]";
+			parameter<float32> mQi				 : expr = "mean(Qi)";
+			attribute<float32> rQi	(Domain): expr = "Context/DynamicGridFactors/Qi[grid_rel] / mQi";
+			attribute<float32> drQi (Domain): expr = "=  'add(' + ModellingRules/PopulationPressure/EvalSuitability + ') * (float32(MetaData/Periods/Duration[PeriodId]) / float32(25))'"; //25: period over which values are estimated.
+			attribute<float32> d	(Domain): expr = "max_elem(rQi + drQi, float32(0))";
+			attribute<float32> nwQi	(Domain): expr = "scalesum(d, sum(Qi))";
+			attribute<float32> Pi	(Domain): expr = "nwQi - Qi";
+			attribute<bool>	   issue	(Domain): expr = "Qi > float32(1000) && nwQi = float32(0)";
+			
+		}*/
+	}
+	Template DegUrbaT {
+		unit<ipoint> domain_1k;
+		unit<uint8> ViewType;
+		container ResultingState;
+		
+		attribute<uint8> IsUrban (domain_1k): expr = "uint8(ResultingState/LandUseVT = Classifications/ModelType/ParamConstants/Urban)";
+		unit<uint32> unit_district := district_8(ResultingState/LandUseVT);
+
+	}
+	
+	Template ExportResultsT {
+		unit<ipoint> domain_1k;
+		unit<uint8>  ViewType;
+		container ClaimRegions: 	expr = "../ClaimRegions";
+		container ClaimRasters: 	expr = "../ClaimRasters";
+		container ResultingState:	expr = "../ResultingState";
+		container ChangeMaps:		expr = "../ChangeMaps";
+		
+		unit<uint16> Countries: expr = "= 'ClaimRegions/Countries'";
+		
+		
+		parameter<string> name := geometries/CountryGroup/name[CountryGroup_sel];
+		parameter<string> path := '%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+string(MetaData/Periods/Year[PeriodId])+'/';
+		
+		parameter<bool>	store: expr = "True", ExplicitSuppliers = "domain/LandUseVT;domain/Qi;domain/Cocoa_Yield;cocoa_tree_ages;";
+		
+		unit<ipoint> domain: expr = "domain_1k" {
+			attribute<ViewType> LandUseVT: 	expr = "ResultingState/LandUseVT", StorageName = "= path + 'LUi.tif'" {	
+				attribute<UInt32> PaletteData(ViewType): Expr = "ViewType/Color";
+			}
+			attribute<Classifications/Change> UrbanChange:  expr = "ChangeMaps/Urban", StorageName = "= path + 'URBi_ch.tif'" {	
+				attribute<uint32> PaletteData(Classifications/Change): expr = "Classifications/Change/Color";
+			}
+			attribute<int32> 	QiChange:					expr = "MakeDefined(int32(ChangeMaps/Qi), int32(0))", StorageName = "= path + 'Qi_ch.tif'";
+			attribute<int32> 	Qi:							expr = "MakeDefined(int32(ResultingState/Qi), int32(0))", StorageName = "= path + 'Qi.tif'";
+			attribute<float32>	Ai:							expr = "Context/DynamicGridFactors/PotAccess", StorageName = "= path + 'Ai.tif'";
+			attribute<float32>	TPi:						expr = "Context/DynamicGridFactors/TransportPerformance", StorageName = "= path + 'TPi.tif'";
+			attribute<int32>  	UrbanPop:					expr = "LandUseVT = ViewType/paramconstants/Urban ? Qi : int32(0 / 0)";
+			attribute<float32>	Cocoa_Yield:				expr = "LandUseVT = ViewType/paramconstants/Cocoa ? Context/StaticGridFactors/perc_cocoa_climate_suit * (Classifications/cocoa_tree_age/npv_yield[classify(float32(ResultingState/cocoa_age), Classifications/cocoa_tree_age/age)]) : 0f", StorageName = "= path + '_Cocoa_Yield.tif'";
+		}
+		container cocoa_tree_ages:= for_each_nedva(/Classifications/cocoa_tree_age/LabelText, 'sum(uint32(ResultingState/cocoa_age = '+string(id(/Classifications/cocoa_tree_age))+'), ClaimRasters/Ghana_Regions_old10)', ClaimRegions/Ghana_regions_old10, uint32, path+'_cocoa_tree_age.dbf');
+		container countrytotals: expr = "for_each_nedv(ViewType/Name, 'sum(uint32(domain/LandUseVT = ViewType/paramconstants/'+ViewType/Name+'), ClaimRasters/Countries)', ClaimRegions/Countries, uint32)" {
+			attribute<string> 	ZoneId	(Countries): expr = "Countries/ZoneId";
+			attribute<int32> 	Pop 	(Countries): expr = "sum(domain/Qi, ClaimRasters/Countries)";
+			attribute<int32> 	UrbanPop(Countries): expr = "sum(domain/UrbanPop, ClaimRasters/Countries)";
+			attribute<int32> 	PD05th	(Countries): expr = "nth_element(domain/UrbanPop, (Urban *  5) / 100, ClaimRasters/Countries)";
+			attribute<float32>  PDmean	(Countries): expr = "float32(Pop) / float32(Urban)";
+			attribute<int32> 	PD95th	(Countries): expr = "nth_element(domain/UrbanPop, (Urban * 95) / 100, ClaimRasters/Countries)";
+			attribute<float32>  wTransP	(Countries): expr = "sum(ResultingState/Context/DynamicGridFactors/TransportPerformance * ResultingState/Qi, ClaimRasters/Countries) / sum(ResultingState/Qi, ClaimRasters/Countries)";
+			attribute<float32>	wNE		(Countries): expr = "sum(ResultingState/Context/DynamicGridFactors/NetworkEfficiency * ResultingState/Qi, ClaimRasters/Countries) / sum(ResultingState/Qi, ClaimRasters/Countries)";
+		}
+		unit<ipoint> results_ReadOnly: expr = "domain_1k" {
+			attribute<ViewType> LandUseVT: 		StorageName = "= PropValue(domain/LandUseVT, 'StorageName')", StorageReadOnly = "True";
+			attribute<int32>	Qi:				StorageName = "= PropValue(domain/Qi, 'StorageName')", StorageReadOnly = "True";
+			//attribute<float32>  Ai:				StorageName = "= PropValue(domain/Ai, 'StorageName')", StorageReadOnly = "True";
+			//attribute<float32>  TPi:			StorageName = "= PropValue(domain/TPi, 'StorageName')", StorageReadOnly = "True";
+			attribute<float32>  Cocoa_Yield:	StorageName = "= PropValue(domain/Cocoa_Yield, 'StorageName')", StorageReadOnly = "True";
+			unit<uint16>	cocoa_ages:= ClaimRegions/Ghana_regions_old10, storagename = "= path+'_cocoa_tree_age.dbf'" {
+				attribute<string> ZoneId:= ClaimRegions/Ghana_regions_old10/ZoneId;
+				attribute<uint32> Period:=  const(uint32(MetaData/Periods/Year[PeriodId]),.,uint32);
+			}
+		}
+		
+	}
+	Template DemographicsT {
+		unit<ipoint> domain;
+		unit<uint16> Region;
+		attribute<Region> 		RegionRel 			(domain);
+		
+		container NaturalChanges {
+			container PopulationStock {
+				attribute<float32> summed (domain): expr = "PrevState/Qi";
+			}
+		}
+		container InternalMovements {
+			container RemainingStock {
+				attribute<float32> summed (domain): expr = "NaturalChanges/PopulationStock/summed";
+			}
+		}
+		container ProjectedTotals {
+			container Population {
+				attribute<float32> summed (Region): 
+					expr = "= 'float32(RunSettings/PopulationProjections/inFile/'+MetaData/Periods/spopProjYear[PeriodId]+')[Region/OrgRef]'";
+			}
+		}
+		container Kj {
+			attribute<float32> summed (Region): expr = "ProjectedTotals/Population/summed - sum(InternalMovements/RemainingStock/summed, RegionRel)";
+		}	
+		attribute<bool>	   popdecline 	(Region):   Expr = "Kj/summed < float32(0)";
+	}
+	Template EconomyT {
+		container Demographics;
+		unit<uint16> Region;
+		
+		attribute<float32> GDP 				(Region): expr = "= 'float32(RunSettings/GDPProjections/inFile/'+MetaData/Periods/spopProjYear[PeriodId]+')[Region/OrgRef]'";
+		attribute<float32> GDP_per_capita 	(Region): expr = "GDP / Demographics/ProjectedTotals/Population/Summed";
+	}
+	Template HousingStockT {
+			unit<uint64> domain;
+			unit<uint16> Region;
+			attribute<Region> 		RegionRel 			(domain);
+			//parameter<string> RegionRelRef;
+			//attribute<uint16> RegionRel (domain): expr = "";
+			attribute<float32>  mean_urb_dens 						(Region): expr = "sum(float32(ModelType/isUrban[PrevState/landuse]) * PrevState/Qi, RegionRel[domain/BaseGrid]) / sum(float32(ModelType/isUrban[PrevState/landuse]), RegionRel[domain/BaseGrid])";
+			attribute<bool>		WasUrban							(domain): expr = "PrevState/LandUse[domain/grid_rel] = ModelType/ParamConstants/Urban";
+			attribute<bool>		IsUrban								(domain): expr = "ResultingState/LandUse[domain/grid_rel] = ModelType/ParamConstants/Urban";
+			attribute<bool>		BecameUrban							(domain): expr = "!WasUrban && IsUrban";
+			attribute<float32>  Si									(domain): expr = "switch("
+				"case(BecameUrban, float32(0.5) * (mean_urb_dens[RegionRel] + Context/DynamicGridFactors/w_Si[domain/grid_rel])), "
+				"case(Context/DynamicGridFactors/Si[domain/grid_rel] 		= 	float32(0) && !IsUrban, Context/DynamicGridFactors/Qi[domain/grid_rel]), "
+				"case(Context/DynamicGridFactors/Age_Si[domain/grid_rel] 	>= 	float32(ModellingRules/SupplyChange), Context/DynamicGridFactors/Qi[domain/grid_rel]), "
+				"Context/DynamicGridFactors/Si[domain/grid_rel])";
+			attribute<float32>	   	Age_Si 		(domain): Expr = "Si = Context/DynamicGridFactors/Si[domain/grid_rel] ? Context/DynamicGridFactors/Age_Si[domain/grid_rel] + float32(MetaData/Periods/Duration[PeriodId]): 0f"; // 0 years if supply has changed in a year
+		}
+		
+	Template PopulationPressureT
+	{
+		unit<uint64>			domain;
+		unit<uint16> 	   		Region;
+		attribute<Region> 		RegionRel 			(domain);
+		
+		attribute<float32>  	randomfield 		(domain): expr = "rnd_uniform(1, domain, range(float32, float32(0.02), float32(0.1)))";		
+								
+		attribute<float32> 		Kj			 		(Region) : Expr = "Demographics/Kj/summed";
+		attribute<float32> 		proto_Pressure1 	(domain): Expr = "= ModellingRules/genSuitabilityRules/PopulationPressure/EvalSuitability";
+		attribute<float32> 		proto_Pressure2		(domain): Expr = "max_elem(max_elem(proto_Pressure1, float32(0)) + (PrevState/Si - PrevState/Qi)[domain/grid_rel], float32(0))";
+		attribute<float32> 		Pressure		 	(domain): Expr = "Demographics/popdecline[RegionRel] ? float32(1) / proto_Pressure2 : proto_Pressure2";
+		attribute<float32>		diag_pQi	 (domain): Expr = "MakeDefined(scaleSum(Pressure, Regionrel, Kj), float32(0))";
+		//attribute<float32>		diag_rQi	 (domain): Expr = "(PrevState/Qi * r[Regionrel])";
+		attribute<float32> 		Population_Pressure	 (domain): Expr = "MakeDefined(scaleSum(Pressure, Regionrel, Kj), float32(0))";
+		attribute<float32>		Pressure_dif  		(domain): Expr = "Population_Pressure - PrevState/Qi[domain/grid_rel]";
+	}
+	container PopulationDistributionT: IsTemplate = "True"
+	{
+		unit<uint64>			domain;
+		unit<uint16> 	   		Region;
+		attribute<Region> 		RegionRel 			(domain);
+		
+		//unit<uint16> 	   		UrbanProjectionRegion:	Expr = "Claims/UrbanProjectionZones";
+		
+		attribute<float32>  	randomfield (domain): expr = "rnd_uniform(1, domain, range(float32, float32(0.02), float32(0.1)))";
+		
+		attribute<float32> 		Kj			 		(Region) : Expr = "Demographics/Kj/summed";
+		attribute<float32> 		Qj					(Region) : Expr = "Demographics/ProjectedTotals/Population/summed";
+		
+		attribute<float32> 		populator_suit				(domain): expr = "= ModellingRules/GenSuitabilityRules/Populator/EvalSuitability";
+		attribute<float32>		proto_populate				(domain): expr = "float32((context/DynamicGridFactors/is_Urban[domain/grid_rel] > 0f || 1f / (1f + exp(-1f * populator_suit)) > 0.5f) && PrevState/Qi[domain/grid_rel] = 0f)";
+		attribute<float32>		populate					(domain): expr = "max_elem(context/DynamicGridFactors/populated[domain/grid_rel], proto_populate)";
+		attribute<float32> 		proto_Distribution_urb		(domain): expr = "= ModellingRules/GenSuitabilityRules/PopulationDistribution_urb/EvalSuitability";
+		attribute<float32> 		proto_Distribution_nurb		(domain): expr = "= ModellingRules/GenSuitabilityRules/PopulationDistribution_nurb/EvalSuitability";
+		attribute<float32>		attractiveness_maps			(domain): expr = "min_elem(exp(context/DynamicGridFactors/is_Urban[domain/grid_rel] = 0f ?  proto_Distribution_nurb : proto_Distribution_urb), context/RegionalFactors/p99_GHS_fPop_15[RegionRel])";
+		attribute<float32> 		proto_Distribution 			(domain): expr = "populate * attractiveness_maps";
+		attribute<float32>		Redistribution				(domain): expr = "Demographics/popdecline[Regionrel] ? min_elem(float32(1) / proto_Distribution, PrevState/Qi[domain/grid_rel]) : proto_Distribution";
+		attribute<float32> 		Population_Distribution		(domain): Expr = "max_elem(Demographics/InternalMovements/RemainingStock/summed[domain/grid_rel] + MakeDefined(scaleSum(Redistribution, Regionrel, Kj), float32(0)), float32(0))";
+		attribute<float32>		Distribution_dif  			(domain): Expr = "Population_Distribution - PrevState/Qi[domain/grid_rel]";
+		
+		attribute<int32>		rnd_Qi		 (domain): Expr = "roundDown(Population_Distribution)";
+		
+		container discretelyAllocQi: expr = "loop(discrete_people_allocator, uint16(5))";
+		
+		container discrete_people_allocator: IsTemplate = "True"
+		{
+			parameter<uint16> NrIter;
+			
+			container currValue
+			{
+				attribute<float32>  Qi 				(domain): expr = "float32(rnd_Qi)";
+				attribute<float32> 	Qj_hat			(Region): expr = "sum(Qi, RegionRel)";
+				attribute<float32>  dif_Qj			(Region): expr = "Qj - Qj_hat";
+				parameter<uint32> 	regionalCountErrors: 	expr = "sum(uint32(Abs(Qj_hat - Qj) > float32(5)))";
+				parameter<uint32> 	negativePeopleErrors:	expr = "sum(uint32(Qi < float32(0)))";
+				parameter<uint32>	numErrs:				expr = "regionalCountErrors + negativePeopleErrors";
+			}
+			container nextValue
+			{
+				attribute<float32>	Qi (domain): 			expr = "CurrValue/numErrs = 0 ? CurrValue/Qi: float32(Process/Qi)";
+				attribute<float32> 	Qj_hat			(Region): expr = "sum(Qi, RegionRel)";
+				attribute<float32>  dif_Qj			(Region): expr = "Qj - Qj_hat";
+				parameter<uint32> 	regionalCountErrors: 	expr = "sum(uint32(Abs(Qj_hat - Qj) > float32(5)))";
+				parameter<uint32> 	negativePeopleErrors:	expr = "sum(uint32(Qi < float32(0)))";
+				parameter<uint32>	numErrs:				expr = "regionalCountErrors + negativePeopleErrors";
+			}
+			container Process
+			{
+				attribute<int32>	rnd_Qi			(domain): Expr = "roundDown(CurrValue/Qi)"; // 
+				attribute<float32>  Scale			(domain): Expr = "rnd_Qi >= int32(1) ? (Population_Distribution + randomfield)^float32(-1): float32(1) + randomfield"; // + randomfield to prevent that scalethreshold = 1.
+				attribute<int32>	proto_Qj		(Region):  Expr = "sum(rnd_Qi, Regionrel)";
+				attribute<int32> 	Qj_residual		(Region):  Expr = "round(Qj) - sum(rnd_Qi, Regionrel)";
+				//attribute<int32>	Qj_step			(Region):  Expr = "Qj_residual < int32(0) ? int32(-1) * : int32(1)";
+				attribute<int32>	Qj_step			(Region):  Expr = "MakeDefined(Qj_residual / sum(int32(Selected), RegionRel), int32(0))";
+				attribute<float32> 	ScaleThreshold	(Region):  Expr = "MakeDefined(min_elem(nth_element(Scale, uint32(Abs(Qj_residual)), Regionrel), float32(1)), float32(1))";
+				attribute<int32> 	Qi				(domain): Expr = "Scale < ScaleThreshold[Regionrel] ? max_elem(rnd_Qi + Qj_step[Regionrel], int32(0)): rnd_Qi";
+				attribute<bool>		Selected		(domain): Expr = "Scale < ScaleThreshold[Regionrel]";
+			}
+		}
+		parameter<float32> projectedQ: 		 			  Expr = "sum(count(Qi, Regionrel) > 0 ? Qj: 0f)";
+		parameter<bool>	   allocation_OK:				  Expr = "discretelyAllocQi/lastIter/nextValue/numErrs == 0";
+		attribute<float32> Qi					(domain): Expr = "discretelyAllocQi/LastIter/nextValue/Qi[float32]", IntegrityCheck = "allocation_OK";
+		attribute<float32> dQi					(domain): Expr = "Qi - PrevState/Qi[domain/grid_rel]";
+		attribute<float32> mod_Qj				(Region): Expr = "sum(Qi, Regionrel)";
+	}			
+	Template VariablePreparationT {
+			
+		unit<ipoint> domain;
+		unit<uint8> ModelType;
+		container PrevState;
+		unit<uint16> UrbanClaimRegion;
+		unit<uint16> AgriClaimRegion;
+		
+		container LoadSpatialData: 			expr = "VariablePreparation/LoadSpatialData";
+		container StaticGridFactors: 		expr = "VariablePreparation/StaticGridFactors";
+		container RegionalFactors:			expr = "PrevState/RegionalFactors" {
+			attribute<float32>	 prevpop 		(UrbanClaimRegion):	expr = "sum(PrevState/Qi, Demographics/RegionRel)";
+			attribute<float32>	 prevurb		(UrbanClaimRegion): expr = "sum(float32(ModelType/isUrban[PrevState/LandUse]), Demographics/RegionRel)";
+			attribute<float32> 	 prevdens		(UrbanClaimRegion): expr = "MakeDefined(prevpop / prevurb, prevpop)";
+			attribute<float32> 	 prevGDPpC		(UrbanClaimRegion): expr = "PrevState/Economy/GDP_per_capita";
+			attribute<float32>	 ln_fdPop 		(UrbanClaimRegion):	expr = "log((Demographics/ProjectedTotals/Population/summed) / prevpop)";
+			attribute<float32>	 ln_prevdens	(UrbanClaimRegion):	expr = "log(prevdens)";
+			attribute<float32>   ln_fdGDPperCap	(UrbanClaimRegion):	expr = "log(MakeDefined(Economy/GDP_per_capita / prevGDPpC, float32(1)))";
+			attribute<float32>	 nCrops			(AgriClaimRegion):	expr = "sum(float32(PrevState/LandUse = ModelType/ParamConstants/Crops), ModelClaimRasters/Crops)";
+			attribute<float32>	 nPermanentCrops(AgriClaimRegion):	expr = "sum(float32(PrevState/LandUse = ModelType/ParamConstants/PermanentCrops), ModelClaimRasters/PermanentCrops)";
+			attribute<float32>	 pCrops			(AgriClaimRegion):  expr = "MakeDefined((nCrops) / (nCrops + nPermanentCrops), 0f)";
+			attribute<float32>	 pPermanentCrops(AgriClaimRegion):  expr = "MakeDefined((nPermanentCrops) / (nCrops + nPermanentCrops), 0f)";
+			
+			
+		}
+		container DynamicGridFactors:		expr = "for_each_nedv(MetaData/DynamicFactors/Name, MetaData/DynamicFactors/Ref, domain, float32)";
+		container Access:					expr = "PrevState/Context/Access" {
+			container PotAccess: 			expr = "Accessibility/PotentialAccessCalc(Matrix, domain, DynamicGridFactors/Qi, Centroids)";
+		}
+		
+		
+		
+	}
+}

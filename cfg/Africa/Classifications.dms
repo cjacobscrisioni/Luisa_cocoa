@@ -1,0 +1,201 @@
+container Classifications
+{
+	parameter<string> FilesPath := '%ProjDir%/Classification/' + RunSettings/ScenarioName;
+	
+	unit<uint8> Copernicus_EK := range(uint8,0b,200b)
+	{
+		attribute<Copernicus> Class := invert(Copernicus/Class);
+	}
+	
+	unit<uint8> Copernicus:= range(uint8, 0b, 25b) //Copernicus version 1 used to be 20
+	{
+		attribute<Copernicus_EK>     Class        := value( Matrix/Values[((id(.) * NrAttributes)+uint8(0))[Matrix]],Copernicus_EK);
+		attribute<string>    Name         := string(Matrix/Values[((id(.) * NrAttributes)+uint8(1))[Matrix]]);
+		attribute<uint8>     R            := uint8( Matrix/Values[((id(.) * NrAttributes)+uint8(2))[Matrix]]);
+		attribute<uint8>     G            := uint8( Matrix/Values[((id(.) * NrAttributes)+uint8(3))[Matrix]]);
+		attribute<uint8>     B            := uint8( Matrix/Values[((id(.) * NrAttributes)+uint8(4))[Matrix]]);
+		attribute<uint32>    Color        := rgb(R, G, B), DialogType = "BrushColor";
+		attribute<ModelType> ModelTypeId  := rlookup(Matrix/Values[((id(.) * NrAttributes)+uint8(5))[Matrix]], ModelType/Name);
+		attribute<string>    Label        := Name, DialogType = "LabelText";
+		
+		parameter<uint8> NrAttributes:= 6b;
+		
+		container V := for_each_nedv(name, string(id(.)) + '[..]', void, .);
+		
+		unit<uint8> Matrix:= range(uint8, 0b, uint8(#Copernicus) * NrAttributes)
+		{
+			attribute<string> Values: 
+			[
+				//'Class', 'Name', 									'R', 	'G', 	'B', 	'Modeltype', 
+				'0', 		'no_data', 								'40', 	'40', 	'40', 	'NoData', 
+				'111', 		'evergreen_needleleaf_closed_forest', 	'0', 	'130', 	'0', 	'MatureForest', 
+				'112', 		'evergreen_broadleaf_closed_forest', 	'0', 	'153', 	'0', 	'MatureForest', 
+				'113', 		'deciduous_needleleaf_closed_forest', 	'0', 	'179', 	'0', 	'MatureForest', 
+				'114', 		'deciduous_broadleaf_closed_forest', 	'0', 	'204', 	'0', 	'MatureForest', 
+				'115', 		'mixed_closed_forest', 					'78', 	'117', 	'31', 	'MatureForest', 
+				'116', 		'unknown_closed_forest', 				'0', 	'120', 	'0', 	'MatureForest', 
+				'121', 		'evergreen_needleleaf_open_forest', 	'112', 	'153', 	'0', 	'MatureForest', 
+				'122', 		'evergreen_broadleaf_open_forest', 		'131', 	'179', 	'0', 	'MatureForest', 
+				'123', 		'deciduous_needleleaf_open_forest', 	'150', 	'204', 	'0', 	'MatureForest', 
+				'124', 		'deciduous_broadleaf_open_forest', 		'169', 	'230', 	'0', 	'MatureForest', 
+				'125', 		'mixed_open_forest', 					'146', 	'153', 	'0', 	'MatureForest', 
+				'126', 		'unknown_open_forest', 					'100', 	'140', 	'0', 	'MatureForest', 
+				'20', 		'shrubs', 								'254', 	'187', 	'34', 	'Shrubs', 
+				'30', 		'herbaceous_vegetation', 				'254', 	'254', 	'76', 	'Herbaceous', 
+				'40', 		'cropland', 							'240', 	'150', 	'254', 	'Crops', 
+				'41', 		'cocoa', 								'180', 	'150', 	'254', 	'Cocoa', 
+				'50', 		'urban', 								'254', 	'0', 	'0', 	'Urban', 
+				'60', 		'bare_or_sparse_vegetation', 			'220', 	'220', 	'220', 	'Bare', 
+				'70', 		'snow_and_ice', 						'254', 	'254', 	'254', 	'Snow', 
+				'80', 		'permanent_water_bodies', 				'25', 	'25', 	'254', 	'Water', 
+				'90', 		'herbaceous_wetland', 					'0', 	'150', 	'160', 	'Wetland', 
+				'100', 		'moss_lichen', 							'250', 	'230', 	'160', 	'Wetland', 
+				'200', 		'open_sea', 							'0', 	'0', 	'128', 	'Water', 
+				'255', 		'not_classified', 						'0', 	'0', 	'0', 	'Null'
+			];
+		}
+		
+	}
+
+	unit<uint8> ModelType:= range(uint8, 0b, 13b)
+	{
+		attribute<uint8> 			Class:			expr = "uint8(	Matrix/Values[((id(.) * NrAttributes)+uint8(0))[Matrix]])";
+		attribute<string> 			Name: 			expr = "string(	Matrix/Values[((id(.) * NrAttributes)+uint8(1))[Matrix]])";
+		attribute<bool>				Active: 		expr = "bool(	Matrix/Values[((id(.) * NrAttributes)+uint8(2))[Matrix]])";
+		attribute<string> 			BaseMapClaimDef:expr = "string(	Matrix/Values[((id(.) * NrAttributes)+uint8(3))[Matrix]])";
+		attribute<string> 			ModelClaimDef:	expr = "string(	Matrix/Values[((id(.) * NrAttributes)+uint8(4))[Matrix]])";
+		attribute<string>  			Label: 			expr = "Name", DialogType = "LabelText";
+		attribute<uint8> 			R:				expr = "uint8(	Matrix/Values[((id(.) * NrAttributes)+uint8(5))[Matrix]])";
+		attribute<uint8> 			G:				expr = "uint8(	Matrix/Values[((id(.) * NrAttributes)+uint8(6))[Matrix]])";
+		attribute<uint8> 			B:				expr = "uint8(	Matrix/Values[((id(.) * NrAttributes)+uint8(7))[Matrix]])";
+		attribute<uint32>   		Color: 			expr ="rgb(R, G, B)", DialogType = "BrushColor";
+		attribute<ActiveModelTypes>	ActiveLUref:	expr = "invert(ActiveModelTypes/Nr_OrgEntity)";
+		
+		container ParamConstants: expr = "for_each_nedv(Name, 'uint8('+ string(Class) +')', void, uint8)";
+		
+		parameter<uint8> NrAttributes: expr = "uint8(8)";
+		unit<uint8> Matrix: expr = "range(uint8, uint8(0), uint8(#ModelType) * NrAttributes)" {
+			attribute<string> Values: [
+				//'Class', 	'Name', 		'Active', 	'BaseMapClaimDef', 	'ModelClaimDef', 	'R', 	'G', 	'B', 
+				'0', 		'NoData', 			'0', 	'Countries', 	null,		 	'51', 	'51', 	'51', 
+				'1', 		'Urban', 			'1', 	'Countries', 	'Countries', 	'254', 	'0', 	'0', 
+				'2', 		'Crops', 			'1', 	'Riverbasins', 	'Ghana_Regions_old10', 	'254', 	'254', 	'102', 
+				'3', 		'PermanentCrops', 	'1', 	'Riverbasins', 	'Ghana_Regions_old10', 	'254', 	'165', 	'0', 
+				'4', 		'MatureForest',		'1', 	'Riverbasins', 	'Countries', 	'0', 	'130', 	'0', 
+				'5', 		'YoungForest',		'1', 	'Countries', 	'Countries', 	'0', 	'160', 	'0', 
+				'6', 		'Shrubs', 			'1', 	'Countries', 	null, 			'153', 	'204', 	'51', 
+				'7', 		'Herbaceous', 		'1', 	'Countries', 	null,		 	'153', 	'166', 	'51', 
+				'8', 		'Bare', 			'0', 	'Countries', 	null,		 	'254', 	'254', 	'203', 
+				'9', 		'Snow', 			'0', 	'Countries', 	null,		 	'254', 	'254', 	'254', 
+				'10', 		'Wetland', 			'0', 	'Countries', 	null,		 	'0', 	'150', 	'160', 
+				'11', 		'Water', 			'0', 	'Countries', 	null,		 	'25', 	'25', 	'254',
+				'12', 		'Cocoa', 			'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'254', 	'100', 	'0' 
+			];
+		}
+	}
+	unit<uint8> ActiveModelTypes: expr = "subset(ModelType/Active)" 
+	{
+		attribute<ModelType> 		ModelTypeid: 	expr = "Nr_OrgEntity";
+		attribute<string>			Name:			expr = "ModelType/Name[Nr_OrgEntity]";
+		attribute<string>  			Label: 			expr = "Name", DialogType = "LabelText";
+		attribute<string> 			ModelClaimDef:	expr = "ModelType/ModelClaimDef[Nr_OrgEntity]";
+		attribute<uint32>   		Color: 			expr = "ModelType/Color[Nr_OrgEntity]", DialogType = "BrushColor";
+		attribute<bool>				isUrban:		expr = "id(.) = ParamConstants/Urban";
+		container ParamConstants: 	expr = "for_each_nedv(Name, 'uint8('+ string(id(.)) +')', void, uint8)";
+		unit<uint32> mt32:			expr = "range(uint32, 0, #ActiveModelTypes)" {
+			attribute<ActiveModelTypes>	OrgRef:	expr = "id(.)[ActiveModelTypes]";
+			attribute<string> 			ZoneId: 	expr = "ActiveModelTypes/Name[OrgRef]";
+			attribute<string>  			Label: 		expr = "ZoneId", DialogType = "LabelText";
+		}
+	}
+	unit<uint8> Change:= range(uint8, uint8(0), uint8(4)) {
+		attribute<string> Name: 	['Irrelevant', 'Not_changed', 'New', 'Gone'];
+		attribute<uint32> R: 		[255,	128,	255,	0];
+		attribute<uint32> G: 		[255,	128,	0,		0];
+		attribute<uint32> B: 		[255,	128,	0,		190];
+		attribute<uint32> Color: 	expr = "rgb(R, G, B)", DialogType = "BrushColor";
+		attribute<string> LabelText:= Name;
+	}	
+	unit<uint32> ModelledTransitions: expr = "combine(ActiveModelTypes, ActiveModelTypes)" {
+		attribute<string>			ZoneId: 		expr = "ActiveModelTypes/Name[first_rel] + 'To' + ActiveModelTypes/Name[second_rel]";
+		attribute<upoint>			pointRef:		expr = "point(uint32(first_rel), uint32(second_rel), upoint)";
+	}
+	unit<uint32> SpeedStats: expr = "range(uint32, 0, 33)" {
+		
+		attribute<string> 			Name:			expr = "string(	Matrix/Values[((id(.) * NrAttributes)+0)[Matrix]])";
+		attribute<string>			RoadClass:		expr = "string(	Matrix/Values[((id(.) * NrAttributes)+1)[Matrix]])";
+		attribute<string>			OSM_Surface:	expr = "string(	Matrix/Values[((id(.) * NrAttributes)+2)[Matrix]])";
+		attribute<uint32>			Frequency:		expr = "uint32(	Matrix/Values[((id(.) * NrAttributes)+3)[Matrix]])";
+		attribute<float32>			Mean_Speed:		expr = "float32(Matrix/Values[((id(.) * NrAttributes)+4)[Matrix]])";
+		
+		parameter<float32>			Connector_Speed: expr = "Sum(Mean_Speed * float32(Name = 'tertiary_x_')) / float32(1.2)";
+		
+		//container readFile: expr = "TableChopper(FilesPath + '/Speed_stats.csv', SpeedStats)";
+		//container readFile: expr = "BaseData/LoadCsvFiles/SpeedStats/inFile";
+		
+		//matrix below: speed estimates from OSM depending on road class and road surface
+		//averaged from OSM observations by Konstantin Rosina, Fall 2018
+		parameter<uint32> NrAttributes: expr = "5";
+		unit<uint32> Matrix: expr = "range(uint32, 0, #SpeedStats * NrAttributes)" {
+			attribute<string> Values: [
+			//'id',						'road_class',		surface',	'frequency','mean_speed',
+			'motorway_x_',				'motorway',			'',			'3476',		'105.149597238',
+			'motorway_x_asphalt',		'motorway',			'asphalt',	'5787',		'104.644893727',
+			'motorway_x_paved',			'motorway',			'paved',	'269',		'108.550185874',
+			'motorway_link_x_',			'motorway_link',	'',			'802',		'54.0710723192',
+			'motorway_link_x_asphalt',	'motorway_link',	'asphalt',	'1708',		'49.9004683841',
+			'primary_x_',				'primary',			'',			'9806',		'63.2328166429',
+			'primary_x_asphalt',		'primary',			'asphalt',	'20633',	'59.284689575',
+			'primary_x_gravel',			'primary',			'gravel',	'136',		'89.625',
+			'primary_x_paved',			'primary',			'paved',	'499',		'64.370741483',
+			'primary_x_unpaved',		'primary',			'unpaved',	'184',		'84.5108695652',
+			'primary_link_x_',			'primary_link',		'',			'482',		'41.6701244813',
+			'primary_link_x_asphalt',	'primary_link',		'asphalt',	'561',		'39.5989304813',
+			'secondary_x_',				'secondary',		'',			'8410',		'57.2280618312',
+			'secondary_x_asphalt',		'secondary',		'asphalt',	'10878',	'55.009836367',
+			'secondary_x_gravel',		'secondary',		'gravel',	'264',		'84.7765151515',
+			'secondary_x_paved',		'secondary',		'paved',	'591',		'60.3384094755',
+			'secondary_x_unpaved',		'secondary',		'unpaved',	'277',		'66.7220216606',
+			'secondary_link_x_',		'secondary_link',	'',			'406',		'37.3645320197',
+			'secondary_link_x_asphalt',	'secondary_link',	'asphalt',	'405',		'39.5432098765',
+			'tertiary_x_',				'tertiary',			'',			'5121',		'50.4046084749',
+			'tertiary_x_asphalt',		'tertiary',			'asphalt',	'7565',		'53.9994712492',
+			'tertiary_x_compacted',		'tertiary',			'compacted','203',		'55.2216748768',
+			'tertiary_x_gravel',		'tertiary',			'gravel',	'433',		'75.3741339492',
+			'tertiary_x_ground',		'tertiary',			'ground',	'129',		'40.4108527132',
+			'tertiary_x_paved',			'tertiary',			'paved',	'605',		'58.0958677686',
+			'tertiary_x_unpaved',		'tertiary',			'unpaved',	'576',		'56.9097222222',
+			'tertiary_link_x_',			'tertiary_link',	'',			'292',		'32.7054794521',
+			'tertiary_link_x_asphalt',	'tertiary_link',	'asphalt',	'172',		'37.9651162791',
+			'trunk_x_',					'trunk',			'',			'6044',		'75.2339510258',
+			'trunk_x_asphalt',			'trunk',			'asphalt',	'15331',	'71.296523384',
+			'trunk_x_paved',			'trunk',			'paved',	'1154',		'83.0155979203',
+			'trunk_link_x_',			'trunk_link',		'',			'582',		'46.3505154639',
+			'trunk_link_x_asphalt',		'trunk_link',		'asphalt',	'927',		'52.1790722762'
+			];
+		}
+	}
+	
+	unit<uint32> cocoa_age_class: nrofrows = 12 {
+		attribute<float32> 	min_age:= float32(id(.)) * 5f;
+		attribute<string> 	LabelText:= 'age_'+string(min_age);
+		//attribute<float32> 	cumu_break: [ 20f, 150f, 275f, 357f, 422f, 469f, 483f, 494f, 503f, 511f, 518f, 524f], 
+		attribute<float32> 	cumu_break: [ 20, 150, 275, 357, 422, 469, 483, 494, 503, 511, 518, 524], 
+			Descr = "Cumulative breaks needed for random classification into cocoa age classes. 
+				Based on mean observed cocoa plantation age class sizes provided by Ole Boysen for all age classes aged 0-30. 
+				Extrapolated for older age classes using a power function for older age classes, which has been estimated on the 10-30 year old age classes and takes the form s= 1366.4x^-1.035"; 
+		attribute<float32>	rel_cumu_break:= cumu_break / max(cumu_break), Descr = "Cumulative breaks rescaled to 0-1 values";
+		
+		parameter<string> yieldcurve_eq3:= 'exp(1.6399f - (0.18f * age) + (2.924f * log(age + 0.01f)))'; // yield curve reschaled to zero to one value
+		
+	}
+	unit<uint32> cocoa_tree_age: nrofrows = 100 {
+		attribute<string> LabelText:= 'from_'+string(id(.)); 
+		attribute<float32> age:= float32(id(.));
+		attribute<float32> yield:= = cocoa_age_class/yieldcurve_eq3;
+		attribute<float32> cumuyield:= cumulate(yield);
+		attribute<float32> npv_yield:= cumuyield[min_elem(id(.)+RunSettings/Scenarios/NPV_foot[RunSettings/ScenarioId], #.-1)] - cumuyield;
+		attribute<float32> perc_npv_yield:= npv_yield / max(npv_yield);
+		
+	}
+}

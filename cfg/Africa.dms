@@ -1,0 +1,820 @@
+//###################################################################
+// Africa
+// October, 2022
+// Authors: Maarten Hilferink & Jip Claassens Object Vision, Chris Jacobs, JRC
+//    
+//   
+//   Copyright 2018 European Union
+//   
+//   Licensed under the EUPL, Version 1.1 or - as soon they
+//   will be approved by the European Commission - subsequent
+//   versions of the EUPL (the "Licence");
+//   You may not use this work except in compliance with the
+//   Licence.
+//   You may obtain a copy of the Licence at:
+//   
+//  http://joinup.ec.europa.eu/software/page/eupl/licence-eupl   
+//   Unless required by applicable law or agreed to in
+//   writing, software distributed under the Licence is
+//   distributed on an "AS IS" basis,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+//   express or implied.
+//   See the Licence for the specific language governing
+//   permissions and limitations under the Licence.
+//   
+//###################################################################
+
+container Africa_Cacao
+{
+	container RunSettings 
+	{
+		parameter<Scenarios> ScenarioId            := 11[Scenarios];
+		parameter<string> 	 ScenarioName			:= Scenarios/LabelText[ScenarioId];
+		parameter<bool>		 ForestProtection		:= Cocoa_Scenarios/ForestProtection[Scenarios/second_rel[ScenarioId]];
+		parameter<string>    SSP_ScenarioName       := SSP_Scenarios/SocioEconomicAssumptions[Scenarios/first_rel[ScenarioId]];
+		parameter<string> 	 Cocoa_ScenarioName		:= Cocoa_Scenarios/LabelText[Scenarios/second_rel[ScenarioId]];
+		parameter<string> 	 Agric_ScenarioName		:= Cocoa_Scenarios/AgricClaim[Scenarios/second_rel[ScenarioId]];
+		parameter<bool>      RunSingleCountry      := TRUE;
+		parameter<string>    RunSingleCountry_name := 'GHA';
+		
+		container PopulationProjections    := ='BaseData/LoadCsvFiles/Pop_projections_'+SSP_ScenarioName;
+		container GDPProjections           := ='BaseData/LoadCsvFiles/GDP_projections_'+SSP_ScenarioName;
+		container AgricultureProjections   := ='BaseData/LoadCsvFiles/'+Agric_ScenarioName;
+		container CocoaProjections		   := ='BaseData/LoadCsvFiles/'+Cocoa_ScenarioName;
+		
+		unit<uint32> Scenarios := combine(SSP_Scenarios, Cocoa_Scenarios) {
+			attribute<string> LabelText:= SSP_Scenarios/LabelText[first_rel]+'_'+Cocoa_Scenarios/LabelText[second_rel];
+			attribute<bool>   Unconstrained:= Cocoa_Scenarios/Unconstrained[second_rel];
+			attribute<uint32> NPV_foot:= Cocoa_Scenarios/NPV_foot[second_rel];
+		}
+		
+		unit<uint32> SSP_Scenarios : NrOfRows = 5 
+		{
+			attribute<string> SocioEconomicAssumptions := 'SSP'+string(id(.)+1);
+			attribute<string> LabelText                := SocioEconomicAssumptions, DialogType = "LabelText";
+		}
+		unit<uint32> Cocoa_Scenarios: NrOfRows = 6 {
+			attribute<string> LabelText: ['Cocoa_static', 'Cocoa_trend', 'Cocoa_LID', 'Cocoa_PF', 'Cocoa_LID_PF', 'Cocoa_uncons_bau'];
+			attribute<string> AgricClaim: ['Agric_static', 'Agric_trend', 'Agric_LID', 'Agric_PF', 'Agric_LID_PF', 'Agric_static'];
+			attribute<bool>	  ForestProtection:= id(.) = 3 || id(.) = 4;
+			attribute<bool>   Unconstrained:= id(.) >= 2;
+			attribute<bool>   RevenueModification:= pcount(cocoa_revenue_modifiers/revenue_inputs/Scenario_rel) > 0;
+			attribute<uint32> NPV_foot:= const(25,.,uint32);
+		}
+		
+		#include<Cocoa_revenue_modifiers.dms>
+	}
+	
+	container ModelParameters
+	{
+		parameter<uint8> Cocoa_Threshold := 50b; //percentage of a cell that has to be cocoa for it to be considered cocoa. (10m --> 100m aggregation)
+		parameter<uint8> Landuse_Threshold := 50b; //percentage of a cell that has to be cocoa for it to be considered cocoa. (10m --> 100m aggregation)
+	}
+	
+	#include<Classifications.dms>
+	#include<MetaData.dms>
+	#include<Geometries.dms>
+	
+	container BaseData 
+	{
+		unit<uint32> Country := LoadSpatialData/Countries/inFile;
+		unit<ipoint> Landuse: StorageName = "%AfricaSourceDataDir%/landuse/copernicus_GLC_v2_0_1_discr_class_Africa_EPSG_102022_clipped.tif", StorageType = "gdal.grid", StorageReadOnly = "True", DialogData = "geometries/BaseProjection"
+		{
+			// The following attributes are only read or calculated during the tiling operatons
+			attribute<uint8> GridData; // don't read this, it is a memory block of 82178 x 89023 bytes = 6.8 GB.
+
+			attribute<uint8> RT_GridData              (geometries/RegularTiledRaster); // read this only for setting up the tiling.
+			attribute<bool>  SelectCountry_GridData   (geometries/RegularTiledRaster) := IsDefined(Geometries/CountryGroup/select_unit/per_RegularTiledRaster);
+			attribute<bool>  RT_IsStudyArea           (geometries/RegularTiledRaster) := =RunSettings/RunSingleCountry ? 'SelectCountry_GridData' : 'RT_GridData < 200b';
+			
+			unit<uint64> 	 RT_StudyAreaSelection := subset(RT_IsStudyArea);
+			
+			// the following can be used when the decoupled StudyAreaTile has been generated
+			attribute<Classifications/Copernicus_EK> ST_GridData      (geometries/SelectedTiledRaster);
+			attribute<Classifications/Copernicus>    ST_GridData_CopK (geometries/SelectedTiledRaster) := Classifications/Copernicus_EK/class[ST_GridData];
+			attribute<Classifications/Copernicus>    ST_GridData_edit (geometries/SelectedTiledRaster) := /BaseData/LoadSpatialData/cocoa_ETH_2022/inFile/ReadData >= ModelParameters/Cocoa_Threshold ? Classifications/Copernicus/V/Cocoa : ST_GridData_CopK;
+			attribute<bool>                       ST_IsStudyArea       (geometries/SelectedTiledRaster) := ST_GridData_edit < 200b;
+			//attribute<Classifications/ModelType>  ST_SA_LU_MT          (geometries/SelectedTiledRaster) := ST_IsStudyArea ? Classifications/Copernicus/ModelTypeId[ST_GridData_edit] : -1[Classifications/ModelType];
+			attribute<Classifications/Copernicus> ST_LU          	  (geometries/SelectedTiledRaster) := ST_IsStudyArea ? ST_GridData_CopK : -1[Classifications/Copernicus];
+			//attribute<Classifications/Copernicus> ST_LU          	  (geometries/SelectedTiledRaster) := ST_IsStudyArea ? ST_GridData_edit : -1[Classifications/Copernicus];
+			attribute<Country>                    CountryId            (geometries/SelectedTiledRaster) := poly2grid(Country/Geometry, geometries/SelectedTiledRaster);
+			
+			container PerCountryGroup := 
+				for_each_ndnv(
+					geometries/CountryGroup/name
+					, geometries/CountryGroupDomains
+					, geometries/CountryGroup/name
+					, uint8
+				) {
+					attribute<uint8> calib_LU (GHA_calibration/study_100m);
+				}
+		}
+		
+		container LoadSpatialData := 
+			for_each_ne(
+				MetaData/SpatialDataToLoad/Name
+				, 'Templates/loadDataFile_'+MetaData/SpatialDataToLoad/Type+'('+Quote(MetaData/SpatialDataToLoad/Path)+','+quote(MetaData/SpatialDataToLoad/Ext)+')'
+			);
+			
+		container LoadCsvFiles := 
+			for_each_ne(
+				MetaData/CsvDataToLoad/Name
+				,'Templates/loadDataFile_csv('+Quote(MetaData/CsvDataToLoad/Path)+','+MetaData/CsvDataToLoad/TargetUnit+','+Quote(MetaData/CsvDataToLoad/ZoneIdField)+')'
+			) {
+				container Cocoa_uncons_bau:= Cocoa_trend;
+			}
+			
+		#include<BoundarySets.dms>
+		
+		container AggregateToCountries:= 
+			for_each_nedv(
+				IsNull(strpos(MetaData/SpatialDataToLoad/Type, 'poly')) ? MetaData/SpatialDataToLoad/Name : ''
+				, 'sum(LoadSpatialData/'+MetaData/SpatialDataToLoad/Name+'/inFile/ReadData, LoadSpatialData/Countries/RasterIds)[int32]'
+				, Country
+				, int32
+			) 
+		{
+			attribute<string>  Name				   (Country) := Country/ISO;
+			attribute<float32> Copernicus_Urban_15 (Country) := sum(float32(Landuse/ST_LU = Classifications/ModelType/ParamConstants/Urban), Landuse/CountryId) / float32(100.0);
+			attribute<float32> Copernicus_Urban_00 (Country) := (float32(GHS_BU_00) / float32(GHS_BU_14)) * Copernicus_Urban_15;
+			attribute<float32> Copernicus_Urban_90 (Country) := (float32(GHS_BU_90) / float32(GHS_BU_14)) * Copernicus_Urban_15;
+			
+			container Export := Templates/TableComposer_uint32(Country, AggregateToCountries, '%LocalDataProjDir%/country_results.csv', 'Name;'+AsList(IsNull(strpos(MetaData/SpatialDataToLoad/Type, 'poly')) ? MetaData/SpatialDataToLoad/Name : '', ';'));
+		}
+		
+		container GenPanelDataSet 
+		{
+			unit<uint32> CountryPanel := union_unit(Country, Country, Country)
+			{
+				attribute<float32>  Cop_urban     := union_data(., AggregateToCountries/Copernicus_Urban_90, AggregateToCountries/Copernicus_Urban_00, AggregateToCountries/Copernicus_Urban_15);
+				attribute<Country>  CountryId     := union_data(., id(Country), id(Country), id(Country));
+				attribute<string>   CountryCode   := Country/ISO[CountryId];
+				attribute<uint32>   Year          := union_data(., const(0,Country,uint32), const(1,Country,uint32), const(2,Country,uint32));
+				attribute<int32>    BuiltUp       := union_data(., AggregateToCountries/GHS_BU_90, AggregateToCountries/GHS_BU_00, AggregateToCountries/GHS_BU_14);
+				attribute<int32>    Pop           := union_data(., AggregateToCountries/GHS_Pop_90, AggregateToCountries/GHS_Pop_00, AggregateToCountries/GHS_Pop_15);
+			}
+		}
+	}
+	
+	container PerCountryGroup := 
+		for_each_ne(
+			geometries/CountryGroup/select ? geometries/CountryGroup/name : ''
+			, 'CountryGroupT('+string(id(geometries/CountryGroup))+'[geometries/CountryGroup])'
+		);
+	
+	container ResultsGathering 
+	{
+		attribute<Classifications/ModelType> BaseMap (Geometries/SelectedTiledRaster1k) := = 
+			'raster_merge(
+				invert(id(BaseData/BoundarySets/BoundaryDomains16/MozaikRegions))[BaseData/BoundarySets/RasterSets1k_16/MozaikRegions]
+				,Classifications/ModelType
+				,'+ AsItemList(geometries/CountryGroup/select ? 'PerCountryGroup/'+geometries/CountryGroup/name+'/VariablePreparation/baseMap_io/readLandUse' : '')+
+			')', StorageName = "= '%LocalDataProjDir%/landuse_2012.tif'" 
+			{
+				attribute<UInt32> PaletteData (Classifications/ModelType) := Classifications/ModelType/Color; 
+			}
+			
+		parameter<string> LU_RO_ref := (AsitemList(geometries/CountryGroup/select ? 'PerCountryGroup/'+geometries/CountryGroup/name+'/ModelIterations/XXXX/ExportResults/results_ReadOnly/LandUseVT' : ''));
+		parameter<string> Qi_RO_ref := (AsitemList(geometries/CountryGroup/select ? 'PerCountryGroup/'+geometries/CountryGroup/name+'/ModelIterations/XXXX/ExportResults/results_ReadOnly/Qi' : ''));
+		parameter<string> Ai_RO_ref := (AsitemList(geometries/CountryGroup/select ? 'PerCountryGroup/'+geometries/CountryGroup/name+'/ModelIterations/XXXX/ExportResults/results_ReadOnly/Ai' : ''));
+		parameter<string> TPi_RO_ref:= (AsitemList(geometries/CountryGroup/select ? 'PerCountryGroup/'+geometries/CountryGroup/name+'/ModelIterations/XXXX/ExportResults/results_ReadOnly/TPi' : ''));
+		
+		container LandUseGrids := 
+			for_each_nedva(
+				MetaData/Periods/sYear
+				, 'raster_merge(invert(id(BaseData/BoundarySets/BoundaryDomains16/MozaikRegions))[BaseData/BoundarySets/RasterSets1k_16/MozaikRegions], Classifications/ModelType, '+replace(LU_RO_ref, 'XXXX', MetaData/Periods/sYear)+')'
+				, Geometries/SelectedTiledRaster1k
+				, Classifications/ModelType
+				, '%LocalDataProjDir%/'+RunSettings/ScenarioName+'/landuse_'+string(MetaData/Periods/Year)+'.tif'
+			);
+			
+		container PopulationGrids := 
+			for_each_nedva(
+				MetaData/Periods/sYear
+				, 'raster_merge(invert(id(BaseData/BoundarySets/BoundaryDomains16/MozaikRegions))[BaseData/BoundarySets/RasterSets1k_16/MozaikRegions], int32, '+replace(Qi_RO_ref, 'XXXX', MetaData/Periods/sYear)+')'
+				, Geometries/SelectedTiledRaster1k
+				, int32
+				, '%LocalDataProjDir%/'+RunSettings/ScenarioName+'/pop_'+string(MetaData/Periods/Year)+'.tif'
+			);
+			
+		container Ai_Grids := 
+			for_each_nedva(
+				MetaData/Periods/sYear
+				, 'raster_merge(invert(id(BaseData/BoundarySets/BoundaryDomains16/MozaikRegions))[BaseData/BoundarySets/RasterSets1k_16/MozaikRegions], float32, '+replace(Ai_RO_ref, 'XXXX', MetaData/Periods/sYear)+')'
+				, Geometries/SelectedTiledRaster1k
+				, float32
+				, '%LocalDataProjDir%/'+RunSettings/ScenarioName+'/Ai_'+string(MetaData/Periods/Year)+'.tif'
+			);
+			
+		container TPi_Grids := 
+			for_each_nedva(
+				MetaData/Periods/sYear
+				, 'raster_merge(invert(id(BaseData/BoundarySets/BoundaryDomains16/MozaikRegions))[BaseData/BoundarySets/RasterSets1k_16/MozaikRegions], float32, '+replace(TPi_RO_ref, 'XXXX', MetaData/Periods/sYear)+')'
+				, Geometries/SelectedTiledRaster1k
+				, float32
+				, '%LocalDataProjDir%/'+RunSettings/ScenarioName+'/TPi_'+string(MetaData/Periods/Year)+'.tif'
+			);
+			
+		container ReadOnly 
+		{
+			container Pop := 
+				for_each_ndva(
+					MetaData/Periods/sYear
+					, Geometries/SelectedTiledRaster1k
+					, int32
+					, '%LocalDataProjDir%/'+RunSettings/ScenarioName+'/pop_'+string(MetaData/Periods/Year)+'.tif'
+				);
+		}
+	}
+	#include<GHA_calibration.dms>
+	#include<ModelTemplate.dms>
+	
+	Template CountryGroupT: Using = "Classifications" 
+	{
+		parameter<geometries/CountryGroup> CountryGroup_sel;
+		parameter<string>                  name             := geometries/CountryGroup/name[CountryGroup_sel];
+		
+		unit<ipoint> domain_100m := BaseMapPreparation/domain_100m;
+		unit<ipoint> domain_1k   := BaseMapPreparation/domain_1k;
+		
+		Container Boundaries := BaseData/BoundarySets/compileBoundaryReferences(CountryGroup_sel, domain_1k);
+		
+		Container Context := VariablePreparation;
+		
+		Container VariablePreparation 
+		{
+			container                   PrevState             := Context;
+			container                   Context               := VariablePreparation;
+			parameter<MetaData/Periods> PeriodId              := 0;
+			attribute<float32>			Random 	  (domain_1k) := rnd_uniform(0, domain_1k, range(float32, 0f, 5f));
+			attribute<bool>				is_cocoa  (domain_1k) := LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa;
+			
+			attribute<ModelType>        LandUseVT (domain_1k) := = ExistingFile('x:/x','%LocalDataProjDir%/'+ name +'/BaseMap/landuse.tif') = 'x:/x' ? 'baseMap_io/storeLandUse' : 'baseMap_io/readLandUse';
+			attribute<ActiveModelTypes> LandUse   (domain_1k) := ModelType/ActiveLURef[LandUseVT];
+			attribute<float32>          Qi        (domain_1k) := IsDefined(invert(AllocDomain/Nr_OrgEntity)) ? DynamicGridFactors/Qi : float32(0);
+			attribute<float32>          Si        (domain_1k) := Qi;
+			attribute<Classifications/cocoa_age_class> cocoa_age_class (domain_1k) := LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa ? classify(Random, Classifications/cocoa_age_class/rel_cumu_break * 5f) : const(0 / 0[Classifications/cocoa_age_class], domain_1k, Classifications/cocoa_age_class);
+			attribute<float32>          Age_LU    (domain_1k) := LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa ? Classifications/cocoa_age_class/min_age[classify(Random, Classifications/cocoa_age_class/rel_cumu_break * 5f)] + rnd_uniform(10, domain_1k, range(float32, 0f, 5f)) : Random * 10f;			
+			attribute<float32>          Age_Si    (domain_1k) := rnd_uniform(0, domain_1k, range(float32, 0f, 10f));
+			
+			container LoadSpatialData := 
+				for_each_ne(
+					MetaData/SpatialDataToLoad/Name
+					, 'Templates/loadDataFile_'+MetaData/SpatialDataToLoad/Type+'('+Quote(MetaData/SpatialDataToLoad/Path)+','+quote(MetaData/SpatialDataToLoad/Ext)+')'
+				);
+			container StaticGridFactors := 
+				for_each_nedv(
+					MetaData/StaticFactors/Name
+					, MetaData/StaticFactors/Ref
+					, domain_1k
+					, float32
+				);
+				
+			container RegionalFactors := 
+				for_each_nednv(
+					IsDefined(MetaData/RegionalFactors/Ref) ? MetaData/RegionalFactors/Name : ''
+					, MetaData/RegionalFactors/Aggr + '(' + MetaData/RegionalFactors/Ref + ', Boundaries/RasterSets16/'+ MetaData/RegionalFactors/Boundary  +')'
+					, Boundaries/UnitSets16
+					, MetaData/RegionalFactors/Boundary
+					, float32
+				);
+				
+			container DynamicGridFactors := 
+				for_each_nedv(
+					MetaData/DynamicFactors/Name
+					, MetaData/DynamicFactors/OrgRef
+					, domain_1k
+					, float32
+				);
+				
+			container Access := Accessibility/Accessibility_Setup(domain_1k, BaseData/LoadSpatialData/MainRoads_topo/inFile, Boundaries/UnitSets32/RunRegions, 'StaticGridFactors/GHS_Pop_15') 
+			{
+				container PotAccess_1990 := Accessibility/PotentialAccessCalc(Matrix, domain_1k, StaticGridFactors/GHS_Pop_90, Centroids);
+				container PotAccess_2000 := Accessibility/PotentialAccessCalc(Matrix, domain_1k, StaticGridFactors/GHS_Pop_00, Centroids);
+				container PotAccess_2015 := Accessibility/PotentialAccessCalc(Matrix, domain_1k, StaticGridFactors/GHS_Pop_15, Centroids);
+			}
+			container baseMap_io 
+			{
+				parameter<string> 	 LandUseStored := ExistingFile('x:/x','%LocalDataProjDir%/'+ name +'BaseMap/landuse.tif');
+				attribute<ModelType> storeLandUse (domain_1k) := MakeDefined(BaseMapPreparation/BaseMapAlloc/d_alloc/landuse[BaseMapPreparation/BaseMapAlloc/BaseGrid], ModelType/ParamConstants/NoData)
+					, IntegrityCheck = "BaseMapPreparation/BaseMapAlloc/d_alloc/statusFlag", StorageName = "= '%LocalDataProjDir%/'+ name +'/BaseMap/landuse.tif'" 
+				{
+					attribute<UInt32> PaletteData(ModelType) := ModelType/Color; 
+				}
+				attribute<ModelType> readLandUse (domain_1k) : StorageName = "= '%LocalDataProjDir%/'+ name +'/BaseMap/landuse.tif'";
+			}
+		}
+		
+		Container BaseMapPreparation 
+		{
+			unit<ipoint> domain_100m := =RunSettings/RunSingleCountry ? 'Geometries/SelectedTiledRaster' : 'geometries/CountryGroupDomains/'+name 
+			{
+				attribute<geometries/Country>      Country_rel                    := poly2grid(BaseData/Country/Geometry, domain_100m);
+				attribute<geometries/CountryGroup> CountryGroup_rel (domain_100m) := geometries/CountryGroup/per_Country[Country_rel];
+				attribute<bool>                    IsCountry                      := CountryGroup_rel == CountryGroup_sel;
+				
+				// attribute<Copernicus>              landuse                        := ='rlookup(BaseData/landuse/PerCountryGroup/'+name+', Copernicus/Class)';
+				
+				attribute<Copernicus>              landuse                        := =RunSettings/RunSingleCountry ? 'BaseData/Landuse/ST_LU' : 'rlookup(BaseData/landuse/PerCountryGroup/'+name+', Copernicus/Class)';
+				attribute<Copernicus>              landuse_sel                    := IsCountry ? landuse : const(0b/0b,.,Copernicus);
+				attribute<float32>				   cocoa_sel					  := IsCountry ? float32(VariablePreparation/LoadSpatialData/cocoa_ETH_2022/inFile/ReadData) : 0f / 0f;
+				attribute<ModelType>               ModelUse                       := MakeDefined(Copernicus/ModelTypeId[landuse_sel], ModelType/ParamConstants/NoData);
+				attribute<domain_1k>               ref1k                          := id(.)[domain_1k];
+				attribute<BaseMapAlloc>	           BMA_id                         := BaseMapAlloc/realBaseGrid[ref1k];
+			}
+			unit<ipoint> domain_1k := =RunSettings/RunSingleCountry ? 'Geometries/SelectedTiledRaster1k' : 'geometries/CountryGroupDomains1k/'+name
+			{
+				
+				attribute<uint64> n:= pcount(domain_100m/ref1k);
+				
+				container Copernicus_landuse_incidence := for_each_nedv(Copernicus/Name, 'sum(float32(domain_100m/landuse_sel = '+ string(id(Copernicus)) +'[Copernicus]), domain_100m/ref1k)', domain_1k, float32);
+				container ModelType_landuse_incidence  := for_each_nedv(ModelType/Name, 
+					id(ModelType) <> ModelType/ParamConstants/Cocoa ? 'sum(float32(domain_100m/ModelUse = const('+ string(id(ModelType)) +'[ModelType],domain_100m,ModelType)), domain_100m/ref1k)'
+					: 'sum(float32(domain_100m/cocoa_sel), domain_100m/ref1k)', domain_1k, float32)
+				{
+					attribute<bool> AllNoData (domain_1k):= NoData = float32(n);
+				}
+				
+				attribute<bool>   covered (domain_1k) := = 'max_elem(' + AsItemList('uint32(IsNull(Boundaries/RasterSets16/'+ BaseMapModelSetup/RegionRef32/Name +'))') + ') = 0';
+				parameter<string> cov_code            := 'bitand(' + AsItemList('!IsNull(Boundaries/RasterSets16/'+ ModelType/BaseMapClaimDef +')') + ')';
+			}
+			
+			container BaseMapModelSetup
+			{
+				unit<uint32> RegionRef32 := subset(!IsNull(rlookup(MetaData/BoundarySets/Name, ModelType/BaseMapClaimDef)))
+				{	
+					attribute<string> Name:= MetaData/BoundarySets/Name[Nr_OrgEntity];
+				}
+				
+				unit<uint8>	 RegionRef8 := range(uint8, 0b, uint8(#RegionRef32))
+				{	
+					attribute<string>      Name          := RegionRef32/Name[Nr_OrgEntity]; 
+					attribute<RegionRef32> Nr_OrgEntity  := id(.)[RegionRef32];
+				}
+			}
+			
+			unit<uint64> BaseMapAlloc := subset(!domain_1k/ModelType_landuse_incidence/AllNoData && !IsNull(Boundaries/RasterSets32/RunRegions) && domain_1k/covered), Using = "BaseMapModelSetup;", DialogType = "Map", DialogData = "BaseGrid" 
+			{
+				unit<uint64>            domain                   := BaseMapAlloc;
+				attribute<BaseMapAlloc> permutation              := rnd_permutation(0, BaseMapAlloc);
+				attribute<domain_1k>    grid_rel  (BaseMapAlloc) := lookup(permutation, nr_OrgEntity);
+				attribute<BaseMapAlloc> BaseGrid     (domain_1k) := invert(grid_rel);
+				attribute<BaseMapAlloc> realBaseGrid (domain_1k) := invert(nr_OrgEntity);
+			
+				
+				container GenSuitabilityRules:= 
+					for_each_ne(
+						ModelType/Name
+						, 'Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/BaseMap_suitdef_'+ModelType/Name+','+ string(first(Boundaries/UnitSets32/Countries/Nr_OrgEntity)) +')'
+					)
+				{
+					container Pastures       := Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/BaseMap_suitdef_Pastures, first(Boundaries/UnitSets32/RunRegions/Nr_OrgEntity)[uint32]);
+					
+					unit<uint32> CombinedSet := ='union_unit('+ AsItemList(ModelType/Name + '/RelevantFields') +')' 
+					{
+						attribute<string>       Rule := = 'union_data(., '+ AsItemList(ModelType/Name + '/RelevantFields/Rule') + ')';
+						attribute<ModelType>    MTid := = 'union_data(., '+ AsItemList('const('+string(id(ModelType))+'[ModelType], '+ ModelType/Name +'/RelevantFields, ModelType)') +')';
+					}
+				}
+			
+				attribute<string> proto_SuitEvalRef (ModelType)  := 'int32(add(' + asList(GenSuitabilityRules/CombinedSet/Rule, ',', GenSuitabilityRules/CombinedSet/MTid)+') * 100f)';
+				attribute<string> SuitEvalRef       (ModelType)  := 'MakeDefined('+proto_SuitEvalRef+', -9999i)';
+				
+				Container FeasibleSolution;
+				
+				Container RegionMaps := 
+					for_each_nedvn(
+						RegionRef8/Name
+						, 'invert(id(Boundaries/UnitSets16/'+ RegionRef8/Name +'))[Boundaries/RasterSets16/'+ RegionRef8/Name +'[grid_rel]]'
+						, BaseMapAlloc
+						, Boundaries/UnitSets16
+						, RegionRef8/Name
+					);
+				
+				unit<uint16> AtomicRegions := overlay(RegionRef8/Name, BaseMapAlloc, RegionMaps), DialogData = "UnionData", DialogType = "map" //, DialogData = "UnionData", DialogType = "map"
+				{
+					attribute<AtomicRegions> UnionData(BaseMapAlloc);
+					attribute<uint32>        Recs                    := uint32(Pcount(UnionData));
+					attribute<AtomicRegions> ID                      := ID(AtomicRegions);
+					attribute<bool>          error (BaseMapAlloc)    := IsNull(UnionData);
+				}
+				
+				// change this for conversion functions available in LUISA Europe...?
+				unit<uint16> Conversion := AtomicRegions, DialogData = "UnionData", DialogType = "map" 
+				{
+					unit<uint16> CountryZones     := Boundaries/UnitSets16/Countries;
+					unit<uint16> RiverbasinZones  := Boundaries/UnitSets16/Riverbasins
+					{
+						attribute<uint64> ncells := pcount(Regionmaps/Riverbasins);
+					}
+					
+					attribute<uint32>  Arable_FAO     (CountryZones)           := (uint32(BaseData/LoadCsvFiles/FAOSTAT_curr_agri/inFile/ArableLand[Boundaries/UnitSets16/Countries/OrgRef]) * 10);
+					attribute<uint32>  Permanent_FAO  (CountryZones)           := (uint32(BaseData/LoadCsvFiles/FAOSTAT_curr_agri/inFile/PermanentCrops[Boundaries/UnitSets16/Countries/OrgRef]) * 10);
+					attribute<uint32>  Pastures_FAO   (CountryZones)           := (uint32(BaseData/LoadCsvFiles/FAOSTAT_curr_agri/inFile/PermanentMeadowsPastures[Boundaries/UnitSets16/Countries/OrgRef]) * 10);
+					
+					attribute<float32> MapSpam_total                           := sum(VariablePreparation/StaticGridFactors/MapSpam_total[grid_rel], UnionData);
+					attribute<float32> MapSpam_arable                          := sum(VariablePreparation/StaticGridFactors/MapSpam_arable[grid_rel], UnionData);
+					attribute<float32> MapSpam_permacrops                      := Sum(VariablePreparation/StaticGridFactors/MapSpam_permacrops[grid_rel], UnionData);
+					attribute<float32> rel_MapSpam_total                       := MapSpam_total / sum(MapSpam_total, Countries)[Countries];
+					attribute<float32> rel_MapSpam_arable                      := MapSpam_arable / sum(MapSpam_arable, Countries)[Countries];
+					attribute<float32> rel_MapSpam_permacrops                  := MapSpam_permacrops / sum(MapSpam_permacrops, Countries)[Countries];
+					
+					attribute<float32> size                  (RiverbasinZones) := float32(pcount(Regionmaps/Riverbasins));
+					
+					attribute<float32> p_Arable_Conv         (RiverbasinZones) := sum(rel_MapSpam_arable * float32(Arable_FAO[Countries]), Riverbasins);
+					attribute<float32> p_Permanent_Conv      (RiverbasinZones) := sum(rel_MapSpam_permacrops * float32(Permanent_FAO[Countries]), Riverbasins);
+					attribute<float32> p_Pastures_Conv       (RiverbasinZones) := sum(rel_MapSpam_total * float32(Pastures_FAO[Countries]), Riverbasins);
+					attribute<float32> p_size                (RiverbasinZones) := p_Arable_Conv + p_Permanent_Conv;
+					
+					attribute<float32> Arable_Conv           (RiverbasinZones) := p_size <= size ? p_Arable_Conv    : p_Arable_Conv * (size / p_size);
+					attribute<float32> Permanent_Conv        (RiverbasinZones) := p_size <= size ? p_Permanent_Conv : p_Permanent_Conv * (size / p_size);
+					attribute<float32> Pastures_Conv         (RiverbasinZones) := p_size <= size ? p_Pastures_Conv 	: p_Pastures_Conv * (size / p_size);
+					 
+				}
+				
+				container Suitabilities := 
+					for_each_nedv(
+						ModelType/name
+						, SuitEvalRef
+						, BaseMapAlloc
+						, int32
+					)
+				{	
+					attribute<int32> Summed (BaseMapAlloc):= ='add('+ AsItemList(ModelType/Name) +')';
+				}
+				
+				container AboveThreshold :=
+					for_each_nedv(
+						ModelType/name
+						, 'Suitabilities/'+ ModelType/name + ' >= int32(-9999)'
+						, BaseMapAlloc
+						, bool
+					);
+					
+				container AggrAboveTreshold := 
+					for_each_nednv(
+						ModelType/Name
+						, 'sum(uint32(AboveThreshold/'+ModelType/Name+'), RegionMaps/'+ModelType/BaseMapClaimDef+')'
+						, Boundaries/UnitSets16
+						, ModelType/BaseMapClaimDef
+						, uint32
+					);
+				
+				container MaxDemands:= for_each_nednv(ModelType/Name, MetaData/DemandModels/RefYearMaxDef, Boundaries/UnitSets16, ModelType/BaseMapClaimDef, uint32);
+				container MinDemands:= for_each_nednv(ModelType/Name, MetaData/DemandModels/RefYearMinDef, Boundaries/UnitSets16, ModelType/BaseMapClaimDef, uint32);
+				
+				container d_alloc:= 
+					discrete_alloc(
+						ModelType/Name
+						, BaseMapAlloc
+						, Suitabilities
+						, rlookup(ModelType/BaseMapClaimDef, RegionRef8/Name)
+						, RegionRef8/Name
+						, AtomicRegions
+						, AtomicRegions/UnionData
+						, MinDemands
+						, MaxDemands
+						, int32(-9999)
+						, FeasibleSolution
+					)
+				{ 
+					attribute<ModelType> landuse (BaseMapAlloc); 
+				}
+				
+				container pastures_alloc 
+				{
+					attribute<float32>  Suitability (BaseMapAlloc)               := = '1f / (add(' + GenSuitabilityRules/Pastures/EvalSuitability +') + rnd_uniform(0,BaseMapAlloc, range(float32,0f,0.05f)))'; 
+					attribute<float32>  MinSuits    (Conversion/RiverbasinZones) := nth_element(Suitability, uint32(Conversion/p_Pastures_Conv), Regionmaps/Riverbasins);
+					attribute<bool>     Pasture     (BaseMapAlloc)               := Suitability <= MinSuits[Regionmaps/Riverbasins];
+				}
+				
+			}
+		}
+		
+		unit<uint64> AllocDomain := subset(IsDefined(VariablePreparation/LandUse) && IsDefined(Boundaries/RasterSets16/RunRegions) && IsDefined(Boundaries/RasterSets16/Ghana_Regions_old10)), DialogType = "Map", DialogData = "BaseGrid" 
+		{
+			attribute<AllocDomain> permutation            := rnd_permutation(0, AllocDomain);
+			attribute<domain_1k>   grid_rel (AllocDomain) := lookup(permutation, nr_OrgEntity);
+			attribute<AllocDomain> BaseGrid (domain_1k)   := invert(grid_rel);
+		}
+		
+		Container ModellingRules : Using = "MetaData" 
+		{ 
+			unit<uint8>  ModelType   := Classifications/ActiveModelTypes;
+			unit<uint32> RegionRef32 := subset(!IsNull(rlookup(MetaData/BoundarySets/Name, ModelType/ModelClaimDef)))
+			{	
+				attribute<string> Name := MetaData/BoundarySets/Name[Nr_OrgEntity];
+			}
+			
+			unit<uint8>	 RegionRef8 := range(uint8, uint8(0), uint8(#RegionRef32))
+			{	
+				attribute<string>      Name         := RegionRef32/Name[Nr_OrgEntity]; 
+				attribute<RegionRef32> Nr_OrgEntity := id(.)[RegionRef32];
+			}
+				
+			container GenSuitabilityRules := 
+				for_each_ne(
+					ModelType/Name
+					, 'Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/Model_suitdef_'+ModelType/Name+','+ string(first(Boundaries/UnitSets32/Countries/Nr_OrgEntity)) +')') 
+			{
+				container Pastures: 					= Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/BaseMap_suitdef_Pastures, first(Boundaries/UnitSets32/RunRegions/Nr_OrgEntity)[uint32]);
+				container Populator:					= Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/Populator_coefs, 	first(Boundaries/UnitSets32/Countries/Nr_OrgEntity)[uint32]);
+				container PopulationPressure: 			= Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/PopulationPressure_coefs, 	first(Boundaries/UnitSets32/Countries/Nr_OrgEntity)[uint32]);
+				container PopulationDistribution_urb: 	= Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/PopulationRedistr_coefs_urb, 	first(Boundaries/UnitSets32/Countries/Nr_OrgEntity)[uint32]);
+				container PopulationDistribution_nurb: 	= Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/PopulationRedistr_coefs_nurb, 	first(Boundaries/UnitSets32/Countries/Nr_OrgEntity)[uint32]);
+				container UrbanDensity:					= Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/urban_density_model, first(Boundaries/UnitSets32/Countries/Nr_OrgEntity)[uint32]);
+				container MinMatureForest: 				= Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/MatureForest_min_model, first(Boundaries/UnitSets32/Countries/Nr_OrgEntity)[uint32]);
+				container MaxYoungForest: 				= Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/YoungForest_max_model, first(Boundaries/UnitSets32/Countries/Nr_OrgEntity)[uint32]);
+				
+				unit<uint32> CombinedSet := = 'union_unit('+ AsItemList(ModelType/Name + '/RelevantFields') +')'
+				{
+					attribute<string>       Rule := = 'union_data(., '+ AsItemList(ModelType/Name + '/RelevantFields/Rule') + ')';
+					attribute<ModelType>    MTid := = 'union_data(., '+ AsItemList('const('+string(id(ModelType))+'[ModelType], '+ ModelType/Name +'/RelevantFields, ModelType)') +')';
+				}
+				
+				attribute<string> SuitEvalRef (ModelType) := 'add(' + asList(GenSuitabilityRules/CombinedSet/Rule, ',', GenSuitabilityRules/CombinedSet/MTid)+')';
+			}
+			container GenTransitionCostModifierRules := 
+				for_each_ne(
+					ModelType/Name
+					, 'Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/TransitionCost_modifier_'+ModelType/Name+','+ string(first(Boundaries/UnitSets32/Countries/Nr_OrgEntity)) +')')
+			{
+				unit<uint32> CombinedSet := = 'union_unit('+ AsItemList(ModelType/Name + '/RelevantFields') +')'
+				{
+					attribute<string> 		Rule := = 'union_data(., '+ AsItemList(ModelType/Name + '/RelevantFields/Rule') + ')';
+					attribute<ModelType> 	MTid := = 'union_data(., '+ AsItemList('const('+string(id(ModelType))+'[ModelType], '+ ModelType/Name +'/RelevantFields, ModelType)') +')';
+				}
+				attribute<string> SuitEvalRef (ModelType) := 'add(' + asList(GenTransitionCostModifierRules/CombinedSet/Rule, ',', GenTransitionCostModifierRules/CombinedSet/MTid)+')';
+			}
+			container GenRevenueModifierRules := 
+				for_each_ne(
+					ModelType/Name
+					, 'Templates/PrepareSuitabilityRules(BaseData/LoadCsvFiles/Revenue_modifier_'+ModelType/Name+','+ string(first(Boundaries/UnitSets32/Countries/Nr_OrgEntity)) +')')
+			{
+				unit<uint32> CombinedSet := = 'union_unit('+ AsItemList(ModelType/Name + '/RelevantFields') +')'
+				{
+					attribute<string> 		Rule := = 'union_data(., '+ AsItemList(ModelType/Name + '/RelevantFields/Rule') + ')';
+					attribute<ModelType> 	MTid := = 'union_data(., '+ AsItemList('const('+string(id(ModelType))+'[ModelType], '+ ModelType/Name +'/RelevantFields, ModelType)') +')';
+				}
+				attribute<string> SuitEvalRef (ModelType) := 'PrevState/landuse[domain/grid_rel] == '+string(id(ModelType))+'[ModelType] ? exp(add(' + asList(GenRevenueModifierRules/CombinedSet/Rule, ',', GenRevenueModifierRules/CombinedSet/MTid)+')) : 1f';
+			}
+			container RegionMaps := for_each_nedvn(RegionRef8/Name, 'invert(id(Boundaries/UnitSets16/'+ RegionRef8/Name +'))[Boundaries/RasterSets16/'+ RegionRef8/Name +'[AllocDomain/grid_rel]]', AllocDomain, Boundaries/UnitSets16, RegionRef8/Name);
+			
+			unit<uint16> AtomicRegions := overlay(RegionRef8/Name, AllocDomain, RegionMaps), DialogData = "UnionData", DialogType = "map"
+			{
+				attribute<AtomicRegions> UnionData(AllocDomain);
+				attribute<uint32> 		 Recs: 					= uint32(Pcount(UnionData));
+				attribute<AtomicRegions> ID: 					= ID(AtomicRegions);
+				attribute<bool>			 error (AllocDomain): 	= IsNull(UnionData);
+			}
+			Container TransitionCosts := = ExistingFile('x:/x','%ProjDir%/parameters/TransitionCosts/'+ name +'.csv') = 'x:/x' 
+				? 'BaseData/LoadCsvFiles/General_transition_costs' 
+				: 'Templates/loadDataFile_csv('+quote('%ProjDir%/parameters/TransitionCosts/'+name)+', Classifications/ModelledTransitions,'+quote('Transition')+')';
+			Container Revenues := = ExistingFile('x:/x','%ProjDir%/parameters/Revenues/'+ name +'.csv') = 'x:/x' 
+				? 'BaseData/LoadCsvFiles/General_revenues' 
+				: 'Templates/loadDataFile_csv('+quote('%ProjDir%/parameters/Revenues/'+name)+', Classifications/ActiveModelTypes/mt32,'+quote('Class')+')';
+			Container RegionalRevenueModifiers:= for_each_nedv(ModelType/Name, 
+				'makedefined(rjoin(point(const('+string(id(ModelType))+',Boundaries/Boundaries/Ghana_Regions_old10/SelectedSet16,uint32), uint32(Boundaries/Boundaries/Ghana_Regions_old10/SelectedSet16/nr_OrgEntity), upoint), 
+					RunSettings/cocoa_revenue_modifiers/scenario_revenues/unirel, RunSettings/cocoa_revenue_modifiers/scenario_revenues/revfactor), 1f) *'
+					'float32(Revenues/inFile/Revenue['+string(id( ModelType ))+'])', 
+					Boundaries/UnitSets16/Ghana_Regions_old10, float32);
+			
+			parameter<uint32> SupplyChange := MetaData/SupplyChange;
+		}
+		Container ModelIterations: 	= 
+			for_each_ne(
+				id(MetaData/Periods) > 0 ? MetaData/Periods/sYear : ''
+				, 'ModelIterationSchemes/ModelT(AllocDomain, domain_1k, Classifications/ActiveModelTypes, Classifications/ModelType, ModellingRules, '+string(id(MetaData/Periods))+'[MetaData/Periods])'
+			) 
+		{
+			container y2015: Using = "ModelIterationSchemes;" 
+			{
+				parameter<MetaData/Periods> PeriodId := 0; 
+				unit<uint64> domain: 			= AllocDomain;
+				unit<uint8> ModelType: 			= Classifications/ActiveModelTypes;
+				unit<uint8> ViewType:			= Classifications/ModelType;
+				unit<uint8> RegionRef8:			= ModellingRules/RegionRef8;
+				Container PrevState: 			= VariablePreparation;
+				Container Context: 				= VariablePreparationT(domain_1k, ModelType, PrevState, ModelClaimRegions/Urban, ModelClaimRegions/Crops);
+				Container ModelClaimRegions:	= for_each_ind('nex', ModelType/Name, MakeDefined('Boundaries/UnitSets16/'+ModelType/ModelClaimDef, 'Boundaries/UnitSets16/Countries'), uint16);
+				Container ModelClaimRasters:	= for_each_nedvn(ModelType/Name, MakeDefined('ClaimRasters/'+ModelType/ModelClaimDef, 'ClaimRasters/Countries'), domain_1k, ClaimRegions, MakeDefined(ModelType/ModelClaimDef, 'Countries'));	
+				Container ClaimRegions:			= for_each_ind('nex', RegionRef8/Name, 'Boundaries/UnitSets16/'+RegionRef8/Name, uint16);
+				Container ClaimRasters:			= for_each_nedvn(RegionRef8/Name, 'Boundaries/RasterSets16/'+RegionRef8/Name, domain_1k, ClaimRegions, RegionRef8/Name);
+				Container Demographics:			= DemographicsT(domain_1k, 	ModelClaimRegions/Urban, ModelClaimRasters/Urban);
+				Container Economy:				= EconomyT(Demographics,		ModelClaimRegions/Urban);
+				Container HousingStock:			= HousingStockT(Domain, 		ModelClaimRegions/Urban, ModelClaimRasters/Urban[Domain/grid_rel]);
+				Container LandUseAllocation 
+				{
+					parameter<bool> cumulStatusFlag: 				= True;
+					
+					container RevenueModifiers:  		expr = "for_each_nedv(ModelType/name, ModelType/Name = 'Cocoa' ? '(Classifications/cocoa_tree_age/perc_npv_yield[classify((PrevState/landuse == 7[ModelType] ? Context/DynamicGridFactors/Age_LU : 1f), Classifications/cocoa_tree_age/age)])[domain/grid_rel]' : 'const(1f,Domain,float32)', Domain, float32)"; 
+					container EmpiricalSuitabilities: 	expr = "= 'for_each_nedv(ModelType/name, ModellingRules/GenSuitabilityRules/SuitEvalRef, Domain, float32)'" {
+						attribute<domain_1k>  	grid_rel 	(Domain): Expr = "Domain/grid_rel";
+						attribute<float32> 		Summed 		(Domain): expr = "= 'add('+ AsItemList(ModelType/Name) +')'";
+					}
+					container protoSuitabilityLogit:	expr = "for_each_nedv(ModelType/Name, ModelType/Name = 'Urban' ? 'EmpiricalSuitabilities/Urban' : 'exp(EmpiricalSuitabilities/'+ModelType/Name+') / (float32(1) + exp(EmpiricalSuitabilities/'+ModelType/Name+'))', domain, float32)";
+					container SuitabilityLogit:			expr = "for_each_nedv(ModelType/Name, 'MakeDefined(protoSuitabilityLogit/'+ModelType/Name+' / max(protoSuitabilityLogit/'+ModelType/Name+'), float32(0))', domain, float32)";
+				}
+				
+				Container PopulationDistribution:= PopulationDistributionT(Domain,	ModelClaimRegions/Urban, ModelClaimRasters/Urban[Domain/grid_rel]);
+				
+				Container ResultingState 
+				{
+					attribute<float32> 	 Age_LU	 (domain_1k): 		= PrevState/Age_LU;
+					attribute<ModelType> LandUse (domain_1k): 		= PrevState/landuse;
+					attribute<ViewType>  LandUseVT(domain_1k) : 	= PrevState/LandUseVT;
+					attribute<float32>   NewUrban(domain_1k):		= max_elem(float32(Context/StaticGridFactors/GHS_BU_14) - float32(Context/StaticGridFactors/GHS_BU_00), float32(0));
+					attribute<float32>	 Si		 (domain_1k): 		= HousingStock/Si[domain/BaseGrid];
+					attribute<float32>	 Age_Si	 (domain_1k): 		= HousingStock/Age_Si[domain/BaseGrid];
+					attribute<float32>	 Qi		 (domain_1k): 		= PopulationDistribution/Qi[domain/BaseGrid];
+					attribute<Classifications/cocoa_tree_age> cocoa_age (domain_1k):= LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa ? classify(Age_LU, Classifications/cocoa_tree_age/Age) : const(0 / 0, domain_1k, Classifications/cocoa_tree_age);
+					
+					parameter<float32>   cocoa_yield:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)]));
+					parameter<float32>   cocoa_yield_15y:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age) + 15f, Classifications/cocoa_tree_age/age)]));
+					parameter<float32>	 avg_cocoa_suit:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa)) / sum(float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa));
+					
+					parameter<bool> cumu_store:= True, explicitsuppliers = "ExportResults/store;";
+					container Context:			= VariablePreparation/Context;
+					container RegionalFactors:	= Context/RegionalFactors;
+					container LandUseAllocation:= ../LandUseAllocation;
+					container Economy:			= ../Economy;
+					container DegUrba: 			= ModelIterationSchemes/DegUrbaT(domain_1k, Classifications/ModelType, ResultingState);
+				}
+				
+				Container ChangeMaps := 
+					for_each_nedv(
+						ModelType/Name
+						, 'switch(
+							case(VariablePreparation/LandUse <> ModelType/ParamConstants/'+ModelType/Name+' && ResultingState/LandUse <> ModelType/ParamConstants/'+ModelType/Name+', 0[Classifications/Change])
+							, case(VariablePreparation/LandUse = ModelType/ParamConstants/'+ModelType/Name+' && ResultingState/LandUse = ModelType/ParamConstants/'+ModelType/Name+', 	1[Classifications/Change])
+							, case(VariablePreparation/LandUse <> ModelType/ParamConstants/'+ModelType/Name+' && ResultingState/LandUse = ModelType/ParamConstants/'+ModelType/Name+', 	2[Classifications/Change])
+							, case(VariablePreparation/LandUse = ModelType/ParamConstants/'+ModelType/Name+' && ResultingState/LandUse <> ModelType/ParamConstants/'+ModelType/Name+', 	3[Classifications/Change])
+							, 0[Classifications/Change])'
+						, domain_1k
+						, Classifications/Change
+					)
+				{
+					attribute<float32> Qi (domain_1k) := ResultingState/Qi - y2015/ResultingState/Qi;
+				}
+				Container ExportResults := ModelIterationSchemes/ExportResultsT(domain_1k, Classifications/ModelType, Boundaries/UnitSets16, Boundaries/RasterSets16, ResultingState);
+			}
+		}
+		
+		Container ResultsCollection 
+		{
+			//parameter<bool> LU_Q_A_stats:= True, ExplicitSuppliers = "= AsList('ModelIterations/'+MetaData/Periods/sYear+'/ExportResults/LU_Q_A', ';') + ';AggregateStatistics;'";
+			
+			unit<uint32> years:= MetaData/Periods, Using = "AggregateStatistics";
+			
+			unit<uint16> Ghana_Regions_old10:= Boundaries/UnitSets16/Ghana_Regions_old10;
+			
+			
+			parameter<string> period_stats_string                         := AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/LANDUSE');
+			attribute<string> lu_refs (years):= 'ModelIterations/'+years/sYear+'/ExportResults/results_ReadOnly/LandUseVT';
+			attribute<string> lu_stats_string (Classifications/ModelType) := = 'replace(period_stats_string, '+quote('LANDUSE')+', Classifications/ModelType/Name)';
+			
+			parameter<bool> store_cocoa_totals:= True, ExplicitSuppliers = "total_cocoa;total_mature_forest;total_cocoa_in_protected_area;summed_cocoa_yield;summed_forest_loss_by_cocoa;summed_othercrops_loss_by_cocoa;";
+			
+			container all_landuse_results:= for_each_nedv(MetaData/Periods/sYear, lu_refs, BaseMapPreparation/domain_1k, Classifications/ModelType);
+
+			container matureforest_lost:= for_each_nedv(MetaData/Periods/sYear, id(MetaData/Periods) > 0[MetaData/Periods] ? 
+				'uint32((all_landuse_results/'+MetaData/Periods/sYear+' <> Classifications/ModelType/ParamConstants/YoungForest && all_landuse_results/'+MetaData/Periods/sYear+' <> Classifications/ModelType/ParamConstants/MatureForest) && all_landuse_results/'+MetaData/Periods/sYear[sub_or_null(id(MetaData/Periods), 1)]+' = Classifications/ModelType/ParamConstants/MatureForest)' :
+				'const(0,BaseMapPreparation/domain_1k,uint32)', BaseMapPreparation/domain_1k, uint32);
+			container othercrops_to_cocoa:= for_each_nedv(MetaData/Periods/sYear, id(MetaData/Periods) > 0[MetaData/Periods] ? 
+				'uint32(all_landuse_results/'+MetaData/Periods/sYear+' = Classifications/ModelType/ParamConstants/Cocoa && (all_landuse_results/'+MetaData/Periods/sYear[sub_or_null(id(MetaData/Periods), 1)]+' = Classifications/ModelType/ParamConstants/Crops || all_landuse_results/'+MetaData/Periods/sYear[sub_or_null(id(MetaData/Periods), 1)]+' = Classifications/ModelType/ParamConstants/PermanentCrops))' :
+				'const(0,BaseMapPreparation/domain_1k,uint32)', BaseMapPreparation/domain_1k, uint32);
+			container matureforest_to_cocoa:= for_each_nedv(MetaData/Periods/sYear, id(MetaData/Periods) > 0[MetaData/Periods] ? 
+				'uint32(all_landuse_results/'+MetaData/Periods/sYear+' = Classifications/ModelType/ParamConstants/Cocoa && all_landuse_results/'+MetaData/Periods/sYear[sub_or_null(id(MetaData/Periods), 1)]+' = Classifications/ModelType/ParamConstants/MatureForest)' :
+				'const(0,BaseMapPreparation/domain_1k,uint32)', BaseMapPreparation/domain_1k, uint32);
+			container cocoa_in_protected_areas:= for_each_nedv(MetaData/Periods/sYear, 
+				'uint32(all_landuse_results/'+MetaData/Periods/sYear+' = Classifications/ModelType/ParamConstants/Cocoa && VariablePreparation/StaticGridFactors/protected_areas > 0f)', 
+					BaseMapPreparation/domain_1k, uint32);
+				
+			///PerCountryGroup/GHA/Boundaries/RasterSets16/Ghana_Regions_old10
+			container total_cocoa:= for_each_nedv(MetaData/Periods/sYear
+				, 'sum(uint32(all_landuse_results/'+MetaData/Periods/sYear+' = Classifications/ModelType/ParamConstants/Cocoa), Boundaries/RasterSets16/Ghana_Regions_old10)'
+				, Ghana_Regions_old10, uint32)
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_cocoa.csv'", StorageType = "gdalwrite.vect" 
+			{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
+			
+			container total_crops:= for_each_nedv(MetaData/Periods/sYear
+				, 'sum(uint32(all_landuse_results/'+MetaData/Periods/sYear+' = Classifications/ModelType/ParamConstants/Crops), Boundaries/RasterSets16/Ghana_Regions_old10)'
+				,Ghana_Regions_old10,uint32)
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_crops.csv'", StorageType = "gdalwrite.vect" 
+				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
+				
+			container total_mature_forest:= for_each_nedv(MetaData/Periods/sYear
+				, 'sum(uint32(all_landuse_results/'+MetaData/Periods/sYear+' = Classifications/ModelType/ParamConstants/MatureForest), Boundaries/RasterSets16/Ghana_Regions_old10)'
+				, Ghana_Regions_old10, uint32)
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_mature_forest.csv'", StorageType = "gdalwrite.vect" 
+				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
+				
+			container total_forest_loss:= for_each_nedv(MetaData/Periods/sYear
+				, 'sum(matureforest_lost/'+MetaData/Periods/sYear+', Boundaries/RasterSets16/Ghana_Regions_old10)'
+				, Ghana_Regions_old10, uint32)
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_forest_loss.csv'", StorageType = "gdalwrite.vect" 
+				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
+				
+			container total_cocoa_in_protected_area:= for_each_nedv(MetaData/Periods/sYear
+				, 'sum(cocoa_in_protected_areas/'+MetaData/Periods/sYear+', Boundaries/RasterSets16/Ghana_Regions_old10)'
+				, Ghana_Regions_old10, uint32)
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_cocoa_protected_area.csv'", StorageType = "gdalwrite.vect" 
+				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
+			
+			container summed_forest_loss_by_cocoa:= for_each_nedv(MetaData/Periods/sYear
+				, 'sum(matureforest_to_cocoa/'+MetaData/Periods/sYear+', Boundaries/RasterSets16/Ghana_Regions_old10)'
+				, Ghana_Regions_old10, uint32)
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_summed_forest_loss_by_cocoa.csv'", StorageType = "gdalwrite.vect" 
+				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
+						
+			container summed_othercrops_loss_by_cocoa:= for_each_nedv(MetaData/Periods/sYear
+				, 'sum(othercrops_to_cocoa/'+MetaData/Periods/sYear+', Boundaries/RasterSets16/Ghana_Regions_old10)'
+				, Ghana_Regions_old10, uint32)
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_summed_othercrops_loss_by_cocoa.csv'", StorageType = "gdalwrite.vect" 
+				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
+				
+			container summed_cocoa_yield:= for_each_nedv(MetaData/Periods/sYear
+				, 'sum(max_elem(ModelIterations/'+MetaData/Periods/sYear+'/ExportResults/results_ReadOnly/Cocoa_Yield, 0f), Boundaries/RasterSets16/Ghana_Regions_old10)'
+				, Ghana_Regions_old10, float32)
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_summed_cocoa_yield.csv'", StorageType = "gdalwrite.vect" 
+				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
+							
+			container AggregateStatistics:= 
+				for_each_nedva(
+					Classifications/ModelType/Name
+					, 'union_data(years,'+lu_stats_string+')'
+					, years
+					, uint32
+					, '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'
+				)
+			{
+				attribute<string>   ZoneId   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/ZoneId')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
+				attribute<uint32>   Year     (years) := years/Year,                                                                                                   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
+				attribute<int32>    Pop      (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/Pop')+')',      StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
+				attribute<int32>    UrbanPop (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/UrbanPop')+')', StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
+				attribute<int32>    PD05th   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/PD05th')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
+				attribute<float32>  PDmean   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/PDmean')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
+				attribute<int32>    PD95th   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/PD95th')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
+				attribute<float32>  wNE      (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/wNE')+')',      StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
+				attribute<float32>  wTransP  (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/wTransP')+')',  StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
+			}
+		}
+		Container VariablesExport:= 
+			for_each_nedv(
+				MetaData/AllFactors/Grid ? MetaData/AllFactors/Name : ''
+				, MetaData/AllFactors/Ref
+				, AllocDomain
+				, float32
+			)
+		{
+			unit<uint64> domain:= AllocDomain;
+			
+			attribute<domain_1k>        grid_rel    (AllocDomain):= AllocDomain/grid_rel;
+			attribute<ActiveModelTypes> LandUse     (AllocDomain):= VariablePreparation/LandUse[grid_rel], StorageName = "= '%LocalDataProjDir%/'+ name +'/BaseMap/landuse.tif'";
+			attribute<float32>          BU90_Disc   (AllocDomain):= float32(GHS_BU_90 >= float32(GHSValues/selval));
+			attribute<float32>          BU00_Disc   (AllocDomain):= float32(GHS_BU_00 >= float32(GHSValues/selval));
+			attribute<float32>          BU14_Disc   (AllocDomain):= float32(GHS_BU_14 >= float32(GHSValues/selval));
+			
+			container SearchGHS14threshold := 
+				for_each_nedv(
+					GHSValues/code
+					, 'sum(Abs(inc_Urban - (float32(100)*float32(GHS_BU_14 >= float32('+string(id(GHSValues))+'))))) / sum(inc_Urban)'
+					,void
+					,float32
+				); //correlations based
+				
+			container ExportAsGrid := 
+				for_each_nedva(
+					MetaData/AllFactors/Grid ? MetaData/AllFactors/Name : ''
+					, 'MakeDefined(VariablesExport/'+ MetaData/AllFactors/Name + '[AllocDomain/BaseGrid], float32(0 / 0))'
+					, domain_1k
+					, float32
+					, '%LocalDataProjDir%/'+ name +'/Factors/'+ MetaData/AllFactors/Name +'.tif'
+				)
+			{
+				attribute<ModelType> LandUse (domain_1k):= MakeDefined(BaseMapPreparation/BaseMapAlloc/d_alloc/landuse[BaseMapPreparation/BaseMapAlloc/BaseGrid], ModelType/ParamConstants/NoData), StorageName = "= '%LocalDataProjDir%/'+ name +'/BaseMap/landuse.tif'";
+			}
+			
+			container ExportAsCsv:= Templates/TableComposer_uint64(AllocDomain, VariablesExport, '%LocalDataProjDir%/'+ name +'/calibfile/calibfile.csv','LandUse;BU90_Disc;BU00_Disc;BU14_Disc;'+AsList(!MetaData/AllFactors/Regional ? MetaData/AllFactors/Name : '',';'));
+			
+			unit<uint32> GHSValues:= range(uint32, uint32(min(GHS_BU_14)), uint32(max(GHS_BU_14))+1)
+			{
+				attribute<string>  code     := 'v'+string(id(.));
+				attribute<float32> error    := = 'union_data(.,'+AsItemList('SearchGHS14threshold/'+code)+')'; //no longer used
+				parameter<float32> minerror := min(error);
+				parameter<uint32>  selval   := = 'argmin('+AsItemList('SearchGHS14threshold/'+code)+')';
+			}
+		}
+	}	
+	#include<Templates.dms>
+	#include<Accessibility.dms>
+	
+	container ConfigSettings 
+	{ 
+		container Overridable 
+		{
+			parameter<string> AfricaSourceDataDir := '%sourcedatadir%/Africa';
+		}
+	}
+	
+}
