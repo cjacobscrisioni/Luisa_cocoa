@@ -57,7 +57,7 @@ container Classifications
 		
 	}
 
-	unit<uint8> ModelType:= range(uint8, 0b, 13b)
+	unit<uint8> ModelType:= range(uint8, 0b, 15b)
 	{
 		attribute<uint8> 			Class:			expr = "uint8(	Matrix/Values[((id(.) * NrAttributes)+uint8(0))[Matrix]])";
 		attribute<string> 			Name: 			expr = "string(	Matrix/Values[((id(.) * NrAttributes)+uint8(1))[Matrix]])";
@@ -77,19 +77,21 @@ container Classifications
 		unit<uint8> Matrix: expr = "range(uint8, uint8(0), uint8(#ModelType) * NrAttributes)" {
 			attribute<string> Values: [
 				//'Class', 	'Name', 		'Active', 	'BaseMapClaimDef', 	'ModelClaimDef', 	'R', 	'G', 	'B', 
-				'0', 		'NoData', 			'0', 	'Countries', 	null,		 	'51', 	'51', 	'51', 
-				'1', 		'Urban', 			'1', 	'Countries', 	'Countries', 	'254', 	'0', 	'0', 
-				'2', 		'Crops', 			'1', 	'Riverbasins', 	'Ghana_Regions_old10', 	'254', 	'254', 	'102', 
-				'3', 		'PermanentCrops', 	'1', 	'Riverbasins', 	'Ghana_Regions_old10', 	'254', 	'165', 	'0', 
-				'4', 		'MatureForest',		'1', 	'Riverbasins', 	'Countries', 	'0', 	'130', 	'0', 
-				'5', 		'YoungForest',		'1', 	'Countries', 	'Countries', 	'0', 	'160', 	'0', 
-				'6', 		'Shrubs', 			'1', 	'Countries', 	null, 			'153', 	'204', 	'51', 
-				'7', 		'Herbaceous', 		'1', 	'Countries', 	null,		 	'153', 	'166', 	'51', 
-				'8', 		'Bare', 			'0', 	'Countries', 	null,		 	'254', 	'254', 	'203', 
-				'9', 		'Snow', 			'0', 	'Countries', 	null,		 	'254', 	'254', 	'254', 
-				'10', 		'Wetland', 			'0', 	'Countries', 	null,		 	'0', 	'150', 	'160', 
-				'11', 		'Water', 			'0', 	'Countries', 	null,		 	'25', 	'25', 	'254',
-				'12', 		'Cocoa', 			'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'254', 	'100', 	'0' 
+				'0', 		'NoData', 				'0', 	'Countries', 	null,		 				'51', 	'51', 	'51', 
+				'1', 		'Urban', 				'1', 	'Countries', 	'Countries', 				'254', 	'0', 	'0', 
+				'2', 		'Crops', 				'1', 	'Riverbasins', 	'Ghana_Regions_old10', 		'254', 	'254', 	'102', 
+				'3', 		'PermanentCrops', 		'1', 	'Riverbasins', 	'Ghana_Regions_old10', 		'254', 	'165', 	'0', 
+				'4', 		'MatureForest',			'1', 	'Riverbasins', 	'Countries', 				'0', 	'130', 	'0', 
+				'5', 		'YoungForest',			'1', 	'Countries', 	'Countries', 				'0', 	'160', 	'0', 
+				'6', 		'Shrubs', 				'1', 	'Countries', 	null, 						'153', 	'204', 	'51', 
+				'7', 		'Herbaceous', 			'1', 	'Countries', 	null,		 				'153', 	'166', 	'51', 
+				'8', 		'Bare', 				'0', 	'Countries', 	null,		 				'254', 	'254', 	'203', 
+				'9', 		'Snow', 				'0', 	'Countries', 	null,		 				'254', 	'254', 	'254', 
+				'10', 		'Wetland', 				'0', 	'Countries', 	null,		 				'0', 	'150', 	'160', 
+				'11', 		'Water', 				'0', 	'Countries', 	null,		 				'25', 	'25', 	'254',
+				'12', 		'Cocoa', 				'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'254', 	'100', 	'0', 
+				'12', 		'NonCompliant_Cocoa',	'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'144', 	'70', 	'44', 
+				'12', 		'Exhausted_Cocoa', 		'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'155', 	'128', 	'110'
 			];
 		}
 	}
@@ -196,6 +198,7 @@ container Classifications
 		attribute<float32> cumuyield:= cumulate(yield);
 		attribute<float32> npv_yield:= cumuyield[min_elem(id(.)+RunSettings/Scenarios/NPV_foot[RunSettings/ScenarioId], #.-1)] - cumuyield;
 		attribute<float32> perc_npv_yield:= npv_yield / max(npv_yield);
+		attribute<bool>	   exhausted:= age > 10f && yield < 100f;
 		
 	}
 }

@@ -40,10 +40,10 @@ Container MetaData: Using = "Classifications;"
 			);
 		attribute<string> RefYearMinDef := 
 			switch(
-				 case(id(.) = ModelType/ParamConstants/Crops          ,'max_elem(int32(MaxDemands/Crops-1) - MaxDemands/Cocoa[int32], 0i)[uint32]')
-				,case(id(.) = ModelType/ParamConstants/PermanentCrops ,'max_elem(int32(MaxDemands/PermanentCrops-1) - MaxDemands/Cocoa[int32], 0i)[uint32]')
-				,case(id(.) = ModelType/ParamConstants/Cocoa          ,'MakeDefined(MaxDemands/Cocoa - 1, 0)')
-				,case(id(.) = ModelType/ParamConstants/Urban          ,'MakeDefined(MaxDemands/Urban - 1, 0)')
+				 case(id(.) = ModelType/ParamConstants/Crops          ,'max_elem((int32(MaxDemands/Crops)-1i) - MaxDemands/Cocoa[int32], 0i)[uint32]')
+				,case(id(.) = ModelType/ParamConstants/PermanentCrops ,'max_elem((int32(MaxDemands/PermanentCrops)-1i) - MaxDemands/Cocoa[int32], 0i)[uint32]')
+				,case(id(.) = ModelType/ParamConstants/Cocoa          ,'MakeDefined(sub_or_null(MaxDemands/Cocoa, 1), 0)')
+				,case(id(.) = ModelType/ParamConstants/Urban          ,'MakeDefined(sub_or_null(MaxDemands/Urban, 1), 0)')
 				,'const(0, Boundaries/UnitSets16/'+BaseMapClaimDef+', uint32)'
 			);
 	}
@@ -73,7 +73,7 @@ Container MetaData: Using = "Classifications;"
 		attribute<string> OrgRef := id(.) < #DynamicFactors_Def ? DynamicFactors_Def/OrgRef[id(.)[DynamicFactors_Def]] : Ref;
 	}
 	
-	unit<uint32> DynamicFactors_Def : NrOfRows = 28 
+	unit<uint32> DynamicFactors_Def : NrOfRows = 29 
 	{
 		parameter<uint32> NrAttributes := 3;
 		
@@ -111,7 +111,8 @@ Container MetaData: Using = "Classifications;"
 			'rel_GHS_dBU_90_14_km120',	'StaticGridFactors/rel_GHS_dBU_90_14_km120 * float32(1) / (float32(PeriodId) + float32(1))', Null,
 			'rel_GHS_dBU_90_00_km120',	'StaticGridFactors/rel_GHS_dBU_90_00_km120', Null,
 			'cocoa_neighb_prob',		'proximity(is_cocoa, MetaData/Wij/cocoa_summation/Matr)', null,
-			'ln_clim_suit_x_neighb_prob','StaticGridFactors/log_cocoa_climate_suit * cocoa_neighb_prob', null
+			'ln_clim_suit_x_neighb_prob','StaticGridFactors/log_cocoa_climate_suit * cocoa_neighb_prob', null,
+			'cocoa_exhausted',			'float32(Classifications/cocoa_tree_age/exhausted[PrevState/cocoa_age])', null
 			];
 		}
 	}

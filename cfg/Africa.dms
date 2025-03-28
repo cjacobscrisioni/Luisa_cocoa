@@ -28,7 +28,7 @@ container Africa_Cacao
 {
 	container RunSettings 
 	{
-		parameter<Scenarios> ScenarioId            := 11[Scenarios];
+		parameter<Scenarios> ScenarioId            	:= 11[Scenarios];
 		parameter<string> 	 ScenarioName			:= Scenarios/LabelText[ScenarioId];
 		parameter<bool>		 ForestProtection		:= Cocoa_Scenarios/ForestProtection[Scenarios/second_rel[ScenarioId]];
 		parameter<string>    SSP_ScenarioName       := SSP_Scenarios/SocioEconomicAssumptions[Scenarios/first_rel[ScenarioId]];
@@ -45,6 +45,7 @@ container Africa_Cacao
 		unit<uint32> Scenarios := combine(SSP_Scenarios, Cocoa_Scenarios) {
 			attribute<string> LabelText:= SSP_Scenarios/LabelText[first_rel]+'_'+Cocoa_Scenarios/LabelText[second_rel];
 			attribute<bool>   Unconstrained:= Cocoa_Scenarios/Unconstrained[second_rel];
+			attribute<bool>   MaintainYields:= Cocoa_Scenarios/MaintainYields[second_rel];
 			attribute<uint32> NPV_foot:= Cocoa_Scenarios/NPV_foot[second_rel];
 		}
 		
@@ -58,6 +59,7 @@ container Africa_Cacao
 			attribute<string> AgricClaim: ['Agric_static', 'Agric_trend', 'Agric_LID', 'Agric_PF', 'Agric_LID_PF', 'Agric_static'];
 			attribute<bool>	  ForestProtection:= id(.) = 3 || id(.) = 4;
 			attribute<bool>   Unconstrained:= id(.) >= 2;
+			attribute<bool>   MaintainYields:= id(.) = 0; // selects scenarios in which future yields are aggregated and maintained at the regional level. Problematic in case of forest protection.
 			attribute<bool>   RevenueModification:= pcount(cocoa_revenue_modifiers/revenue_inputs/Scenario_rel) > 0;
 			attribute<uint32> NPV_foot:= const(25,.,uint32);
 		}

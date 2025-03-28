@@ -51,10 +51,15 @@ container ModelIterationSchemes {
 					attribute<uint32> 	Crops 			(CropsProjectionZones): 	expr = "!RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] ? (90 * cCrops) / 100 : 0";
 					//attribute<uint32> 	PermanentCrops 	(CropsProjectionZones): 	expr = "!RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] ? (90 * cPermanentCrops) / 100 : 0";
 					attribute<uint32> 	PermanentCrops 	(CropsProjectionZones): 	expr = "(90 * cPermanentCrops) / 100";
-					attribute<uint32> 	Cocoa 			(CropsProjectionZones): 	expr = "!RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] ? MakeDefined(sub_or_null(uint32(CocoaClaim), 1), 0) : MakeDefined(uint32(ScaleSum(sum(float32(PrevState/LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa), ModelClaimRasters/Cocoa), cocoa_km_min_needed)), 0)";
+					attribute<uint32> 	Cocoa 			(CropsProjectionZones): 	expr = "switch(
+						case(RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] && RunSettings/Scenarios/MaintainYields[RunSettings/ScenarioId], MakeDefined(uint32(ScaleSum(sum(float32(PrevState/LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa), ModelClaimRasters/Cocoa), cocoa_km_min_needed)), 0))
+						, case(RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] && !RunSettings/Scenarios/MaintainYields[RunSettings/ScenarioId], 0)
+						, MakeDefined(sub_or_null(uint32(CocoaClaim), 1), 0))";						
 					attribute<uint32> 	Urban			(UrbanProjectionZones): 	expr = "MakeDefined(sub_or_null(uint32(cUrban), 1), 0)";
 					attribute<uint32>	YoungForest		(ForestProjectionZones):	expr = "sum(uint32(PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/YoungForest), ModelClaimRasters/YoungForest)";
 					attribute<uint32>	MatureForest	(ForestProjectionZones):	expr = "min_elem(uint32(round(sum(float32(PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/MatureForest), ModelClaimRasters/MatureForest) + cMatureForest)), 0)";
+					attribute<uint32>	NonCompliant_Cocoa (CropsProjectionZones):  expr = "const(0, CropsProjectionZones, uint32)";
+					attribute<uint32>  	Exhausted_Cocoa   (CropsProjectionZones):  expr = "sum(uint32(context/DynamicGridFactors/cocoa_exhausted), ModelClaimRasters/Exhausted_Cocoa)";
 				}
 				container max: expr = "for_each_nedv(isNull(ModelType/ModelClaimDef) ? ModelType/Name : '', 'const(uint32(#domain),ClaimRegions/Countries,uint32)', ClaimRegions/Countries, uint32)" {
 					attribute<uint32> 	Crops 			(CropsProjectionZones): 	expr = "!RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] ? (111 * cCrops) / 100 : 99999";
@@ -64,6 +69,8 @@ container ModelIterationSchemes {
 					attribute<uint32> 	Urban			(UrbanProjectionZones): 	expr = "uint32(cUrban) + 1";
 					attribute<uint32>	YoungForest		(ForestProjectionZones):	expr = "uint32(round(sum(float32(PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/YoungForest), ModelClaimRasters/YoungForest) + cYoungForest))";
 					attribute<uint32>	MatureForest	(ForestProjectionZones):	expr = "sum(uint32(PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/MatureForest), ModelClaimRasters/MatureForest)";
+					attribute<uint32>	NonCompliant_Cocoa (CropsProjectionZones):  expr = "const(0, CropsProjectionZones, uint32)";
+					attribute<uint32>  	Exhausted_Cocoa   (CropsProjectionZones):  expr = "sum(uint32(context/DynamicGridFactors/cocoa_exhausted), ModelClaimRasters/Exhausted_Cocoa)";
 				}
 			}
 			container TransitionCosts:			expr = "for_each_nedv(ModelType/name, 'float32(rjoin(point(uint32(PrevState/LandUse[domain/grid_rel]), const('+string(id(ModelType))+',domain, uint32), upoint), Classifications/ModelledTransitions/PointRef, ModellingRules/TransitionCosts/inFile/Cost))', domain, float32)";
@@ -97,7 +104,7 @@ container ModelIterationSchemes {
 			attribute<float32>	 Si		 (domain_1k): 		expr = "HousingStock/Si[domain/BaseGrid]";
 			attribute<float32>	 Age_Si	 (domain_1k): 		expr = "HousingStock/Age_Si[domain/BaseGrid]";
 			attribute<float32>	 Qi		 (domain_1k): 		expr = "PopulationDistribution/Qi[domain/BaseGrid]";
-			attribute<Classifications/cocoa_tree_age> cocoa_age (domain_1k):= LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa ? classify(Age_LU, Classifications/cocoa_tree_age/Age) : const(0 / 0, domain_1k, Classifications/cocoa_tree_age);
+			attribute<Classifications/cocoa_tree_age> cocoa_age (domain_1k):= LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa || LandUse == Classifications/ActiveModelTypes/ParamConstants/NonCompliant_Cocoa ? classify(Age_LU, Classifications/cocoa_tree_age/Age) : const(0 / 0, domain_1k, Classifications/cocoa_tree_age);
 			parameter<float32>   cocoa_yield:= sum(Context/StaticGridFactors/perc_cocoa_climate_suit * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)]));
 			parameter<float32>	 avg_cocoa_suit:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa)) / sum(float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa));
 			
