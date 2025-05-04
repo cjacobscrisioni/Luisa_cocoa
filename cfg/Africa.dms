@@ -28,7 +28,7 @@ container Africa_Cacao
 {
 	container RunSettings 
 	{
-		parameter<Scenarios> ScenarioId            	:= 11[Scenarios];
+		parameter<Scenarios> ScenarioId            	:= 9[Scenarios];
 		parameter<string> 	 ScenarioName			:= Scenarios/LabelText[ScenarioId];
 		parameter<bool>		 ForestProtection		:= Cocoa_Scenarios/ForestProtection[Scenarios/second_rel[ScenarioId]];
 		parameter<string>    SSP_ScenarioName       := SSP_Scenarios/SocioEconomicAssumptions[Scenarios/first_rel[ScenarioId]];
