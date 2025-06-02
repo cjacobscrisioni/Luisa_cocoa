@@ -28,7 +28,7 @@ container Africa_Cacao
 {
 	container RunSettings 
 	{
-		parameter<Scenarios> ScenarioId            	:= 9[Scenarios];
+		parameter<Scenarios> ScenarioId            	:= 8[Scenarios];
 		parameter<string> 	 ScenarioName			:= Scenarios/LabelText[ScenarioId];
 		parameter<bool>		 ForestProtection		:= Cocoa_Scenarios/ForestProtection[Scenarios/second_rel[ScenarioId]];
 		parameter<string>    SSP_ScenarioName       := SSP_Scenarios/SocioEconomicAssumptions[Scenarios/first_rel[ScenarioId]];
@@ -71,6 +71,7 @@ container Africa_Cacao
 	{
 		parameter<uint8> Cocoa_Threshold := 50b; //percentage of a cell that has to be cocoa for it to be considered cocoa. (10m --> 100m aggregation)
 		parameter<uint8> Landuse_Threshold := 50b; //percentage of a cell that has to be cocoa for it to be considered cocoa. (10m --> 100m aggregation)
+		parameter<float32> BaseMap_Compliant_Cocoa_fraction := 0.49f, descr = "Fraction of cocoa considered certified and traceable, so very close to actual compliance. Estimate offered by Ole Boysen, 6/5/2025.";
 	}
 	
 	#include<Classifications.dms>
@@ -256,7 +257,7 @@ container Africa_Cacao
 			attribute<float32>          Qi        (domain_1k) := IsDefined(invert(AllocDomain/Nr_OrgEntity)) ? DynamicGridFactors/Qi : float32(0);
 			attribute<float32>          Si        (domain_1k) := Qi;
 			attribute<Classifications/cocoa_age_class> cocoa_age_class (domain_1k) := LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa ? classify(Random, Classifications/cocoa_age_class/rel_cumu_break * 5f) : const(0 / 0[Classifications/cocoa_age_class], domain_1k, Classifications/cocoa_age_class);
-			attribute<float32>          Age_LU    (domain_1k) := LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa ? Classifications/cocoa_age_class/min_age[classify(Random, Classifications/cocoa_age_class/rel_cumu_break * 5f)] + rnd_uniform(10, domain_1k, range(float32, 0f, 5f)) : Random * 10f;			
+			attribute<float32>          Age_LU    (domain_1k) := ActiveModelTypes/isActiveCocoa[LandUse] ? Classifications/cocoa_age_class/min_age[classify(Random, Classifications/cocoa_age_class/rel_cumu_break * 5f)] + rnd_uniform(10, domain_1k, range(float32, 0f, 5f)) : Random * 10f;			
 			attribute<float32>          Age_Si    (domain_1k) := rnd_uniform(0, domain_1k, range(float32, 0f, 10f));
 			
 			container LoadSpatialData := 
@@ -299,7 +300,9 @@ container Africa_Cacao
 			{
 				parameter<string> 	 LandUseStored := ExistingFile('x:/x','%LocalDataProjDir%/'+ name +'BaseMap/landuse.tif');
 				attribute<ModelType> storeLandUse (domain_1k) := MakeDefined(BaseMapPreparation/BaseMapAlloc/d_alloc/landuse[BaseMapPreparation/BaseMapAlloc/BaseGrid], ModelType/ParamConstants/NoData)
-					, IntegrityCheck = "BaseMapPreparation/BaseMapAlloc/d_alloc/statusFlag", StorageName = "= '%LocalDataProjDir%/'+ name +'/BaseMap/landuse.tif'" 
+					, IntegrityCheck = "BaseMapPreparation/BaseMapAlloc/d_alloc/statusFlag"
+					, StorageName = "= '%LocalDataProjDir%/'+ name +'/BaseMap/landuse.tif'"
+					, StorageType = "gdalwrite.grid"
 				{
 					attribute<UInt32> PaletteData(ModelType) := ModelType/Color; 
 				}
@@ -589,6 +592,7 @@ container Africa_Cacao
 				, 'ModelIterationSchemes/ModelT(AllocDomain, domain_1k, Classifications/ActiveModelTypes, Classifications/ModelType, ModellingRules, '+string(id(MetaData/Periods))+'[MetaData/Periods])'
 			) 
 		{
+			container InitialState:= y2015/ResultingState;
 			container y2015: Using = "ModelIterationSchemes;" 
 			{
 				parameter<MetaData/Periods> PeriodId := 0; 
@@ -624,12 +628,13 @@ container Africa_Cacao
 				{
 					attribute<float32> 	 Age_LU	 (domain_1k): 		= PrevState/Age_LU;
 					attribute<ModelType> LandUse (domain_1k): 		= PrevState/landuse;
+					attribute<bool>		 isActiveCocoa (domain_1k):	= ModelType/isActiveCocoa[LandUse];
 					attribute<ViewType>  LandUseVT(domain_1k) : 	= PrevState/LandUseVT;
 					attribute<float32>   NewUrban(domain_1k):		= max_elem(float32(Context/StaticGridFactors/GHS_BU_14) - float32(Context/StaticGridFactors/GHS_BU_00), float32(0));
 					attribute<float32>	 Si		 (domain_1k): 		= HousingStock/Si[domain/BaseGrid];
 					attribute<float32>	 Age_Si	 (domain_1k): 		= HousingStock/Age_Si[domain/BaseGrid];
 					attribute<float32>	 Qi		 (domain_1k): 		= PopulationDistribution/Qi[domain/BaseGrid];
-					attribute<Classifications/cocoa_tree_age> cocoa_age (domain_1k):= LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa ? classify(Age_LU, Classifications/cocoa_tree_age/Age) : const(0 / 0, domain_1k, Classifications/cocoa_tree_age);
+					attribute<Classifications/cocoa_tree_age> cocoa_age (domain_1k):= isActiveCocoa || LandUse==ModelType/ParamConstants/Exhausted_Cocoa ? classify(Age_LU, Classifications/cocoa_tree_age/Age) : const(0 / 0, domain_1k, Classifications/cocoa_tree_age);
 					
 					parameter<float32>   cocoa_yield:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)]));
 					parameter<float32>   cocoa_yield_15y:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age) + 15f, Classifications/cocoa_tree_age/age)]));

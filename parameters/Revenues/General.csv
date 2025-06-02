@@ -7,6 +7,6 @@ MatureForest,1000
 Shrubs,500
 Herbaceous,500
 Cocoa,1000
-NonCompliant_Cocoa, 1000
+HighInput_Cocoa,900
+NonCompliant_Cocoa, 950
 Exhausted_Cocoa, 500
-

@@ -57,7 +57,7 @@ container Classifications
 		
 	}
 
-	unit<uint8> ModelType:= range(uint8, 0b, 15b)
+	unit<uint8> ModelType:= range(uint8, 0b, 16b)
 	{
 		attribute<uint8> 			Class:			expr = "uint8(	Matrix/Values[((id(.) * NrAttributes)+uint8(0))[Matrix]])";
 		attribute<string> 			Name: 			expr = "string(	Matrix/Values[((id(.) * NrAttributes)+uint8(1))[Matrix]])";
@@ -89,9 +89,10 @@ container Classifications
 				'9', 		'Snow', 				'0', 	'Countries', 	null,		 				'254', 	'254', 	'254', 
 				'10', 		'Wetland', 				'0', 	'Countries', 	null,		 				'0', 	'150', 	'160', 
 				'11', 		'Water', 				'0', 	'Countries', 	null,		 				'25', 	'25', 	'254',
-				'12', 		'Cocoa', 				'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'254', 	'100', 	'0', 
-				'12', 		'NonCompliant_Cocoa',	'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'144', 	'70', 	'44', 
-				'12', 		'Exhausted_Cocoa', 		'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'155', 	'128', 	'110'
+				'12', 		'Cocoa', 				'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'200', 	'80', 	'20', 
+				'13',		'HighInput_Cocoa',		'1',	'Riverbasins', 	'Ghana_Regions_old10',  	'254', 	'100', 	'0', 
+				'14', 		'NonCompliant_Cocoa',	'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'144', 	'70', 	'44', 
+				'15', 		'Exhausted_Cocoa', 		'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'155', 	'128', 	'110'
 			];
 		}
 	}
@@ -103,11 +104,21 @@ container Classifications
 		attribute<string> 			ModelClaimDef:	expr = "ModelType/ModelClaimDef[Nr_OrgEntity]";
 		attribute<uint32>   		Color: 			expr = "ModelType/Color[Nr_OrgEntity]", DialogType = "BrushColor";
 		attribute<bool>				isUrban:		expr = "id(.) = ParamConstants/Urban";
+		attribute<bool>				isActiveCocoa:  expr = "id(.) = ParamConstants/Cocoa || id(.) = ParamConstants/HighInput_Cocoa || id(.) = ParamConstants/NonCompliant_Cocoa";
 		container ParamConstants: 	expr = "for_each_nedv(Name, 'uint8('+ string(id(.)) +')', void, uint8)";
 		unit<uint32> mt32:			expr = "range(uint32, 0, #ActiveModelTypes)" {
 			attribute<ActiveModelTypes>	OrgRef:	expr = "id(.)[ActiveModelTypes]";
 			attribute<string> 			ZoneId: 	expr = "ActiveModelTypes/Name[OrgRef]";
 			attribute<string>  			Label: 		expr = "ZoneId", DialogType = "LabelText";
+		}
+		unit<uint32> transitions:= combine(ActiveModelTypes, ActiveModelTypes) {
+			attribute<string> Label:= ActiveModelTypes/Label[first_rel]+'_to_'+ActiveModelTypes/Label[second_rel];
+			attribute<bool> no_age_reset:= 
+				first_rel == second_rel
+				|| (second_rel == ParamConstants/Exhausted_Cocoa)
+				|| (first_rel == ParamConstants/NonCompliant_Cocoa && second_rel == ParamConstants/Cocoa)
+				|| (second_rel == ParamConstants/NonCompliant_Cocoa && first_rel == ParamConstants/Cocoa);
+			attribute<wpoint> uni_point:= point(first_rel[uint16], second_rel[uint16], wpoint);
 		}
 	}
 	unit<uint8> Change:= range(uint8, uint8(0), uint8(4)) {

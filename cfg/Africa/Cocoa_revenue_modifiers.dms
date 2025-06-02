@@ -13,7 +13,7 @@ container cocoa_revenue_modifiers {
 	
 	
 	
-	unit<uint32> revenue_inputs: nrofrows = 78 {
+	unit<uint32> revenue_inputs: nrofrows = 96 {
 		
 		//
 		
@@ -25,7 +25,7 @@ container cocoa_revenue_modifiers {
 		attribute<string> inscenario:= inMatrix/line[((id(.)*4)+2)[inMatrix]];
 		attribute<float32> infactor:= float32(inMatrix/line[((id(.)*4)+3)[inMatrix]]);
 		
-		unit<uint32> inMatrix:= range(uint32, 0, 78*4) {
+		unit<uint32> inMatrix:= range(uint32, 0, 96*4) {
 			
 			attribute<string> line: [
 				'WES',	'Crops',	'lid',	'1.01486016804099',
@@ -76,6 +76,24 @@ container cocoa_revenue_modifiers {
 				'BRA',	'Cocoa',	'lid',	'1.25142580750358',
 				'BRA',	'Cocoa',	'pf',	'1.13240546962638',
 				'BRA',	'Cocoa',	'lid_pf',	'1.39103632916447',
+				'WES',	'NonCompliant_Cocoa',	'lid',	'1.29116369669406',
+				'WES',	'NonCompliant_Cocoa',	'pf',	'1.18167110553856',
+				'WES',	'NonCompliant_Cocoa',	'lid_pf',	'1.48612257415343',
+				'CEN',	'NonCompliant_Cocoa',	'lid',	'1.26880513149639',
+				'CEN',	'NonCompliant_Cocoa',	'pf',	'1.13685017021419',
+				'CEN',	'NonCompliant_Cocoa',	'lid_pf',	'1.41015727957457',
+				'VOL',	'NonCompliant_Cocoa',	'lid',	'1.11726119237455',
+				'VOL',	'NonCompliant_Cocoa',	'pf',	'1.05708168906683',
+				'VOL',	'NonCompliant_Cocoa',	'lid_pf',	'1.18795936335559',
+				'EAS',	'NonCompliant_Cocoa',	'lid',	'1.23802033866415',
+				'EAS',	'NonCompliant_Cocoa',	'pf',	'1.12251324051261',
+				'EAS',	'NonCompliant_Cocoa',	'lid_pf',	'1.36733110980461',
+				'ASH',	'NonCompliant_Cocoa',	'lid',	'1.27377382937352',
+				'ASH',	'NonCompliant_Cocoa',	'pf',	'1.14251608956592',
+				'ASH',	'NonCompliant_Cocoa',	'lid_pf',	'1.42233714630363',
+				'BRA',	'NonCompliant_Cocoa',	'lid',	'1.25142580750358',
+				'BRA',	'NonCompliant_Cocoa',	'pf',	'1.13240546962638',
+				'BRA',	'NonCompliant_Cocoa',	'lid_pf',	'1.39103632916447',
 				'WES',	'YoungForest',	'lid',	'0.997771806299203',
 				'CEN',	'YoungForest',	'lid',	'0.997771806299203',
 				'ACC',	'YoungForest',	'lid',	'0.997771806299203',

@@ -31,7 +31,8 @@ Container MetaData: Using = "Classifications;"
 				,case(id(.) = ModelType/ParamConstants/PermanentCrops ,'MakeDefined(roundUp(Conversion/Permanent_Conv), 0i)[uint32]') 		// * 10 because faostat numbers are in 1000ha (10sq km)
 				//,case(id(.) = ModelType/ParamConstants/PermanentCrops ,'max_elem(int32(roundUp(Conversion/Permanent_Conv)) - MaxDemands/Cocoa[int32], 1i)[uint32]') 		// * 10 because faostat numbers are in 1000ha (10sq km)
 				//,case(id(.) = ModelType/ParamConstants/MatureForest ,'max_elem(int32(roundUp(Sum(float32(domain_1k/ModelType_landuse_incidence/'+ ModelType/Name +'[grid_rel]), RegionMaps/riverbasins) / 100f)) - MaxDemands/Cocoa[int32], 1i)[uint32]') 		// * 10 because faostat numbers are in 1000ha (10sq km)
-				,case(id(.) = ModelType/ParamConstants/Cocoa          ,'roundUp(Sum(float32(domain_1k/ModelType_landuse_incidence/cocoa[grid_rel]), RegionMaps/riverbasins) / (100f * 100f))[uint32]') 
+				,case(id(.) = ModelType/ParamConstants/Cocoa          ,'roundUp(Sum(ModelParameters/BaseMap_Compliant_Cocoa_fraction * float32(domain_1k/ModelType_landuse_incidence/cocoa[grid_rel]), RegionMaps/riverbasins) / (100f * 100f))[uint32]') 
+				,case(id(.) = ModelType/ParamConstants/NonCompliant_Cocoa          ,'roundUp(Sum((1f - ModelParameters/BaseMap_Compliant_Cocoa_fraction) * float32(domain_1k/ModelType_landuse_incidence/cocoa[grid_rel]), RegionMaps/riverbasins) / (100f * 100f))[uint32]') 
 				,case(id(.) = ModelType/ParamConstants/Shrubs         ,'pcount(RegionMaps/Countries)[uint32]')									// potentially fill entire country with shrubs for when claims are too small
 				,case(id(.) = ModelType/ParamConstants/Herbaceous     ,'pcount(RegionMaps/Countries)[uint32]')									// potentially fill entire country with herbaceous for when claims are too small
 				,case(id(.) = ModelType/ParamConstants/NoData         ,'const(0, Boundaries/UnitSets16/Countries, uint32)')
@@ -40,9 +41,10 @@ Container MetaData: Using = "Classifications;"
 			);
 		attribute<string> RefYearMinDef := 
 			switch(
-				 case(id(.) = ModelType/ParamConstants/Crops          ,'max_elem((int32(MaxDemands/Crops)-1i) - MaxDemands/Cocoa[int32], 0i)[uint32]')
-				,case(id(.) = ModelType/ParamConstants/PermanentCrops ,'max_elem((int32(MaxDemands/PermanentCrops)-1i) - MaxDemands/Cocoa[int32], 0i)[uint32]')
+				 case(id(.) = ModelType/ParamConstants/Crops          ,'max_elem((int32(MaxDemands/Crops)-1i) - (MaxDemands/Cocoa + MaxDemands/NonCompliant_Cocoa)[int32], 0i)[uint32]')
+				,case(id(.) = ModelType/ParamConstants/PermanentCrops ,'max_elem((int32(MaxDemands/PermanentCrops)-1i) - (MaxDemands/Cocoa + MaxDemands/NonCompliant_Cocoa)[int32], 0i)[uint32]')
 				,case(id(.) = ModelType/ParamConstants/Cocoa          ,'MakeDefined(sub_or_null(MaxDemands/Cocoa, 1), 0)')
+				,case(id(.) = ModelType/ParamConstants/NonCompliant_Cocoa          ,'MakeDefined(sub_or_null(MaxDemands/NonCompliant_Cocoa, 1), 0)')
 				,case(id(.) = ModelType/ParamConstants/Urban          ,'MakeDefined(sub_or_null(MaxDemands/Urban, 1), 0)')
 				,'const(0, Boundaries/UnitSets16/'+BaseMapClaimDef+', uint32)'
 			);
@@ -73,7 +75,7 @@ Container MetaData: Using = "Classifications;"
 		attribute<string> OrgRef := id(.) < #DynamicFactors_Def ? DynamicFactors_Def/OrgRef[id(.)[DynamicFactors_Def]] : Ref;
 	}
 	
-	unit<uint32> DynamicFactors_Def : NrOfRows = 29 
+	unit<uint32> DynamicFactors_Def : NrOfRows = 32
 	{
 		parameter<uint32> NrAttributes := 3;
 		
@@ -87,6 +89,9 @@ Container MetaData: Using = "Classifications;"
 			'PotAccess',				'Access/PotAccess/Ag',					'Access/PotAccess_2015/Ag',
 			'TransportPerformance',		'Access/PotAccess/TPg',					'Access/PotAccess_2015/TPg',
 			'NetworkEfficiency',		'Access/PotAccess/NEg',					'Access/PotAccess_2015/NEg',
+			'relTransPerf',				'TransportPerformance / max(TransportPerformance)', Null,
+			'invTransPerf',				'1f - relTransPerf',					Null,
+			'scaTransPerf',				'rescale(invTransPerf, 1.0f, 1.1f)',    Null,
 			'relPotAccess',				'PotAccess / mean(PotAccess)', 			Null,
 			'rpa',						'relPotAccess',				 			Null,
 			'rpa2',						'(relPotAccess^2f)', 					Null,
@@ -96,7 +101,7 @@ Container MetaData: Using = "Classifications;"
 			'populated',				'float32(Qi > 0f)',						Null,
 			'inv_TT_Cities',			'StaticGridFactors/inv_TT_Cities',		Null,
 			'Constant',					'StaticGridFactors/Constant',			Null,
-			'Cocoa_protect',			'float32(RunSettings/ForestProtection && (PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/MatureForest || StaticGridFactors/protected_areas > 0f))', Null,
+			'Cocoa_protect',			'float32(RunSettings/ForestProtection && (InitialState/LandUse = Classifications/ActiveModelTypes/ParamConstants/MatureForest || StaticGridFactors/protected_areas > 0f))', Null,
 			'Si',						'PrevState/Si',							Null,
 			'Age_Si',					'PrevState/Age_Si',						Null,
 			'Age_LU',					'PrevState/Age_LU',						Null,
@@ -263,7 +268,7 @@ Container MetaData: Using = "Classifications;"
 
 	unit<uint32> proto_CsvDataToLoad: NrOfRows = 34
 	{
-		unit<uint32> inTable := range(uint32, 0, #CsvDataToLoad * NrAttributes)
+		unit<uint32> inTable := range(uint32, 0, #proto_CsvDataToLoad * NrAttributes)
 		{
 			attribute<string> Elements: 
 			//Name, SourcePath, TargetUnit, ZoneIdField
@@ -366,7 +371,7 @@ Container MetaData: Using = "Classifications;"
 	{
 		parameter<uint32> NrAttributes: expr = "3";
 		
-		unit<uint32> inTable: expr = "range(uint32, 0, #SpatialDataToLoad * NrAttributes)"
+		unit<uint32> inTable: expr = "range(uint32, 0, #BoundarySets * NrAttributes)"
 		{
 			attribute<string> Elements:
 			// Name, ZoneIdCode, OrgLoadingAddress
