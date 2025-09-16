@@ -39,9 +39,9 @@ MatureForestToMatureForest,3,3,MatureForest,MatureForest,-305.802
 MatureForestToYoungForest,3,4,MatureForest,YoungForest,0
 MatureForestToShrubs,3,5,MatureForest,Shrubs,47
 MatureForestToHerbaceous,3,6,MatureForest,Herbaceous,47
-MatureForestToCocoa,3,7,MatureForest,Cocoa,75
+MatureForestToCocoa,3,7,MatureForest,Cocoa,118.763
 MatureForestToRehabilitated_Cocoa,3,8,MatureForest,Rehabilitated_Cocoa,296.9075
-MatureForestToNonCompliant_Cocoa,3,9,MatureForest,NonCompliant_Cocoa,75
+MatureForestToNonCompliant_Cocoa,3,9,MatureForest,NonCompliant_Cocoa,118.763
 MatureForestToExhausted_Cocoa,3,10,MatureForest,Exhausted_Cocoa,1000
 YoungForestToUrban,4,0,YoungForest,Urban,141.531
 YoungForestToCrops,4,1,YoungForest,Crops,157.257

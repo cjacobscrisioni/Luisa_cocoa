@@ -3,6 +3,7 @@ Container Geometries
 	unit<dpoint> AfricanACEA: Format = "EPSG:102022", Descr = "African Albers Conic Equal Area";
 	unit<dpoint> WGS84      : Format = "EPSG:4326";
 	unit<dpoint> BaseProjection := AfricanACEA;
+	unit<dpoint> Mollweide  : Format = "ESRI:54009";
 	
 	// first, let's define an arbitrary regular tiling
 	unit<dpoint> proto_base_grid_10m := gridset(BaseProjection, GetProjectionFactor(Base_grid_100m) * point(0.1d, 0.1d, BaseProjection), GetProjectionOffSet(Base_grid_100m), BaseProjection);

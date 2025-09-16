@@ -58,24 +58,29 @@ Container MetaData: Using = "Classifications;"
 //		attribute<string> OrgRef:	expr = "MakeDefined(Interaction_Variables/Def[Nr_2] + ' * ', '')+proto_DynamicFactors/OrgRef[Nr_1]";
 //	}
 	
-	unit<uint32> proto_DynamicFactors: expr = "union_unit(DynamicFactors_Def, DynamicFactors_Def, Classifications/ModelType, Classifications/ModelType)" 
+	unit<uint32> proto_DynamicFactors: expr = "union_unit(DynamicFactors_Def, Classifications/ModelType, DynamicFactors_Def, Classifications/ModelType)" 
 	{
 		attribute<string> Name:= union_data(., 
 									DynamicFactors_Def/Name
-									, 'w_' + DynamicFactors_Def/Name
 									, 'is_'+ModelType/Name
+									, 'w_' + DynamicFactors_Def/Name
 									, 'w_is_'+ModelType/Name
 								);
 		attribute<string> Ref := union_data(., 
 									DynamicFactors_Def/Ref
+									, 'float32(PrevState/LandUseVT = Classifications/ModelType/ParamConstants/'+ModelType/Name+')'
 									, 'potential('+ DynamicFactors_Def/Name + ', MetaData/Wij/Default/Matr)'
-									, 'float32(BaseMapPreparation/domain_1k/ModelType_landuse_incidence/'+ModelType/Name+' >= ModelParameters/Landuse_Threshold[float32])'
 									, 'potential(is_'+ ModelType/Name + ', MetaData/Wij/Default/Matr)'
 								);
-		attribute<string> OrgRef := id(.) < #DynamicFactors_Def ? DynamicFactors_Def/OrgRef[id(.)[DynamicFactors_Def]] : Ref;
+		attribute<string> OrgRef := union_data(., 
+									DynamicFactors_Def/OrgRef
+									, 'float32(BaseMapPreparation/domain_1k/ModelType_landuse_incidence/'+ModelType/Name+' >= ModelParameters/Landuse_Threshold[float32])'
+									, 'potential('+ DynamicFactors_Def/Name + ', MetaData/Wij/Default/Matr)'
+									, 'potential(is_'+ ModelType/Name + ', MetaData/Wij/Default/Matr)'
+								);
 	}
 	
-	unit<uint32> DynamicFactors_Def : NrOfRows = 32
+	unit<uint32> DynamicFactors_Def : NrOfRows = 34
 	{
 		parameter<uint32> NrAttributes := 3;
 		
@@ -91,7 +96,8 @@ Container MetaData: Using = "Classifications;"
 			'NetworkEfficiency',		'Access/PotAccess/NEg',					'Access/PotAccess_2015/NEg',
 			'relTransPerf',				'TransportPerformance / max(TransportPerformance)', Null,
 			'invTransPerf',				'1f - relTransPerf',					Null,
-			'scaTransPerf',				'rescale(invTransPerf, 1.0f, 1.1f)',    Null,
+			'scaTransPerf',				'rescale(invTransPerf, 0.99f, 1.2f)',   Null,
+			'sqscaTransPerf',			'scaTransPerf * scaTransPerf',   		Null,
 			'relPotAccess',				'PotAccess / mean(PotAccess)', 			Null,
 			'rpa',						'relPotAccess',				 			Null,
 			'rpa2',						'(relPotAccess^2f)', 					Null,
@@ -102,6 +108,7 @@ Container MetaData: Using = "Classifications;"
 			'inv_TT_Cities',			'StaticGridFactors/inv_TT_Cities',		Null,
 			'Constant',					'StaticGridFactors/Constant',			Null,
 			'Cocoa_protect',			'float32(RunSettings/ForestProtection && (InitialState/LandUse = Classifications/ActiveModelTypes/ParamConstants/MatureForest || StaticGridFactors/protected_areas > 0f))', Null,
+			'Forest_next_to_exh_cocoa',	'is_MatureForest * potential(is_Exhausted_Cocoa, MetaData/Wij/QueensCase2/Matr)',							Null,
 			'Si',						'PrevState/Si',							Null,
 			'Age_Si',					'PrevState/Age_Si',						Null,
 			'Age_LU',					'PrevState/Age_LU',						Null,
@@ -156,7 +163,7 @@ Container MetaData: Using = "Classifications;"
 									);
 	}
 	
-	unit<uint32> Proto_StaticFactors: NrOfRows = 57 
+	unit<uint32> Proto_StaticFactors: NrOfRows = 64
 	{
 		parameter<uint32> NrAttributes := 3;
 		
@@ -176,6 +183,12 @@ Container MetaData: Using = "Classifications;"
 			'GHS_dBU_90_00_km120',		'potential(max_elem(GHS_BU_14 - GHS_BU_00, float32(0)), MetaData/Wij/KM120_summation/Matr)', 'float32',
 			'rel_GHS_dBU_90_14_km120',	'GHS_dBU_90_14_km120 / max(GHS_dBU_90_14_km120)', 'float32',
 			'rel_GHS_dBU_90_00_km120',	'GHS_dBU_90_00_km120 / max(GHS_dBU_90_00_km120)', 'float32',
+			'insettlement',				'float32(isdefined(BaseData/LoadSpatialData/settlements/RasterIds))', 'float32',
+			'tt_settlement',			'VariablePreparation/Access/SettAccess_2020/sWg', 'float32',
+			'sq_tt_settlement',			'sqr(tt_settlement)', 'float32',
+			'scaled_tt_settlement',		'min_elem((tt_settlement - min(tt_settlement)) / rth_element(tt_settlement, 0.95f), 1f)', 'float32',
+			'inv_scaled_tt_settlement',	'1f - scaled_tt_settlement', 'float32',
+			'sca_tt_settlement',		 'rescale(scaled_tt_settlement, 0.99f, 1.2f)', 'float32',
 			'GHS_Pop_90', 				'float32(max_elem(LoadSpatialData/GHS_Pop_90/inFile/ReadData, int32(0)))', 'float32',
 			'GHS_Pop_00', 				'float32(max_elem(LoadSpatialData/GHS_Pop_00/inFile/ReadData, int32(0)))', 'float32',
 			'GHS_Pop_15', 				'float32(max_elem(LoadSpatialData/GHS_Pop_15/inFile/ReadData, int32(0)))', 'float32',
@@ -218,7 +231,8 @@ Container MetaData: Using = "Classifications;"
 			'wgt_ghsl_in_ghsl_uc',		'MakeDefined(1f / (sum(GHS_BU_14, LoadSpatialData/ghsl_uc/RasterIds)[LoadSpatialData/ghsl_uc/RasterIds]), 0f)'			,'float32',
 			'cocoa_climate_suit'		,'float32(LoadSpatialData/cocoa_climate_suit_2016/inFile/ReadData)'														,'float32',
 			'log_cocoa_climate_suit'	,'log(max_elem(float32(LoadSpatialData/cocoa_climate_suit_2016/inFile/ReadData), 0.01f))' 								,'float32',
-			'perc_cocoa_climate_suit'	,'min_elem(cocoa_climate_suit / rth_element(cocoa_climate_suit, 0.95f), 1f)' 																		,'float32',
+			'perc_cocoa_climate_suit'	,'min_elem(cocoa_climate_suit / rth_element(cocoa_climate_suit, 0.95f), 1f)' 											,'float32',
+			'mod_perc_cocoa_climate_suit','perc_cocoa_climate_suit < 0.2f ? 0f : perc_cocoa_climate_suit'														,'float32',
 //			'sqr_cocoa_climate_suit'	,'sqr(float32(LoadSpatialData/cocoa_climate_suit_2016/inFile/ReadData))'			 									,'float32',
 			'log_slope'					,'log(max_elem(float32(LoadSpatialData/slope/inFile/ReadData), 0.01f))'														,'float32', 
 			'log_rough'					,'log(max_elem(float32(LoadSpatialData/roughness/inFile/ReadData), 0.01f))'													,'float32',
@@ -316,7 +330,7 @@ Container MetaData: Using = "Classifications;"
 		
 		parameter<uint32> NrAttributes: expr = "4";
 	}
-	unit<uint32> SpatialDataToLoad: NrOfRows = 30
+	unit<uint32> SpatialDataToLoad: NrOfRows = 31
 	{
 		
 		unit<uint32> inTable: expr = "range(uint32, 0, #SpatialDataToLoad * NrAttributes)"
@@ -330,6 +344,7 @@ Container MetaData: Using = "Classifications;"
 			'Ecoregions',		 	'poly',      '%AfricaSourceDataDir%/natural/eco_p_c_2017_Africa','shp',
 			'FUAs',			 		'poly',      '%AfricaSourceDataDir%/boundaries/Global_FUA_regions_ldd_la_lpp_lg_100_tmulti__v19E_Africa','shp',
 			'UrbanCentres',		 	'poly',      '%AfricaSourceDataDir%/boundaries/GHS_STAT_UCDB2015MT_GLOBE_R2019A_V1_0_Africa','shp',
+			'Settlements',			'poly',		 '%AfricaSourceDataDir%/settlements/africa_settlements_p2023_v1_2020_ACEA','shp',
 			'TravelTimeToCities',	'int32tiff', '%AfricaSourceDataDir%/accessibility/access_to_cities_Africa','tif',
 			'ruggedness',			'int32tiff', '%AfricaSourceDataDir%/physical/FINAL_tri_AFRICA_1km','tif',
 			'roughness',			'int32tiff', '%AfricaSourceDataDir%/physical/FINAL_roughness_AFRICA_1km','tif',
@@ -402,6 +417,12 @@ Container MetaData: Using = "Classifications;"
 		{	
 			attribute<UInt32>  Dist2: Expr = "Dist2(point(Int16(0), Int16(0), .), uint32)"; // Sqare distance to origin (= cell with row=0 and col=0) in raster cell units.
 			attribute<Float64> Attr : Expr = "float64(Dist2 > 0  && Dist2 <= (2))"; //
+			attribute<Float32> Matr : Expr = "scalesum(Float32(Attr), Float32(1.0))"; // divides Attr by the sum of Attr so that the sum of Matr equals 1.
+		}
+		unit<SPoint> QueensCase2: Expr = "range(spoint, point(int16(-2), int16(-2)), point(int16(3), int16(3)))", Descr = "Queens case contiguous neighbours (two orders)"
+		{	
+			attribute<UInt32>  Dist2: Expr = "Dist2(point(Int16(0), Int16(0), .), uint32)"; // Sqare distance to origin (= cell with row=0 and col=0) in raster cell units.
+			attribute<Float64> Attr : Expr = "float64(Dist2 > 0  && Dist2 <= (5))"; //
 			attribute<Float32> Matr : Expr = "scalesum(Float32(Attr), Float32(1.0))"; // divides Attr by the sum of Attr so that the sum of Matr equals 1.
 		}
 		unit<SPoint> oldMapSpamInterpolation: expr = "range(spoint, point(int16(-6), int16(-6)), point(int16(7), int16(7)))" {

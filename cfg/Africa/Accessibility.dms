@@ -167,6 +167,9 @@ Container Accessibility: Using = "Geometries;" {
 		// Matrix/EuclDist_km <= float32(120)
 		// float32(Matrix/EuclDist_km / 130f) * 60f)
 		
+		attribute<float32> sWi		  (Centroids/i32)		 := min((withPj = 0f ? 99999999f : withPj)[Matrix/DstZone_rel] * Matrix/Impedance , Matrix/OrgZone_rel);
+		attribute<float32> sWg		  (MG)					 := MakeDefined(sWi[Centroids/i32_ref], (potential(sWi[Centroids/i32_ref], MetaData/Wij/AccessInterpolation/Attr) /  Centroids/OrgsWeight)); //potential accesibility spatially interpolated to grid
+		attribute<float32> withPj	  (Centroids/j_inside32) := float32(Pj > 0f);
 		attribute<float32> Pj         (Centroids/j_inside32) := sum(Pg, Centroids/j_inside_ref)[Centroids/j_inside32/org]; //population
 		attribute<float32> Ai         (Centroids/i32)        := sum(Pj[Matrix/DstZone_rel] * (Matrix/Impedance^distdecay), Matrix/OrgZone_rel); //potential accesibility
 		attribute<float32> Ag         (MG)                   := MakeDefined(Ai[Centroids/i32_ref], (potential(Ai[Centroids/i32_ref], MetaData/Wij/AccessInterpolation/Attr) /  Centroids/OrgsWeight)); //potential accesibility spatially interpolated to grid

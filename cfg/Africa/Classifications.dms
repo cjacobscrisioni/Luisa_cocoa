@@ -57,7 +57,7 @@ container Classifications
 		
 	}
 
-	unit<uint8> ModelType:= range(uint8, 0b, 16b)
+	unit<uint8> ModelType:= range(uint8, 0b, 15b)
 	{
 		attribute<uint8> 			Class:			expr = "uint8(	Matrix/Values[((id(.) * NrAttributes)+uint8(0))[Matrix]])";
 		attribute<string> 			Name: 			expr = "string(	Matrix/Values[((id(.) * NrAttributes)+uint8(1))[Matrix]])";
@@ -70,8 +70,15 @@ container Classifications
 		attribute<uint8> 			B:				expr = "uint8(	Matrix/Values[((id(.) * NrAttributes)+uint8(7))[Matrix]])";
 		attribute<uint32>   		Color: 			expr ="rgb(R, G, B)", DialogType = "BrushColor";
 		attribute<ActiveModelTypes>	ActiveLUref:	expr = "invert(ActiveModelTypes/Nr_OrgEntity)";
+		attribute<bool>				isActiveCocoa:  expr = "id(.) = ParamConstants/Cocoa || id(.) = ParamConstants/Rehabilitated_Cocoa || id(.) = ParamConstants/NonCompliant_Cocoa";
 		
 		container ParamConstants: expr = "for_each_nedv(Name, 'uint8('+ string(Class) +')', void, uint8)";
+		
+		unit<uint32> transition_matrix:= combine(ModelType, ModelType) {
+			attribute<string> from:= ModelType/Name[first_rel];
+			attribute<string> to:= ModelType/Name[second_rel];
+			attribute<upoint>	 unipt:= point(first_rel[uint32], second_rel[uint32], upoint);
+		}
 		
 		parameter<uint8> NrAttributes: expr = "uint8(8)";
 		unit<uint8> Matrix: expr = "range(uint8, uint8(0), uint8(#ModelType) * NrAttributes)" {
@@ -81,18 +88,18 @@ container Classifications
 				'1', 		'Urban', 				'1', 	'Countries', 	'Countries', 				'254', 	'0', 	'0', 
 				'2', 		'Crops', 				'1', 	'Riverbasins', 	'Ghana_Regions_old10', 		'254', 	'254', 	'102', 
 				'3', 		'PermanentCrops', 		'1', 	'Riverbasins', 	'Ghana_Regions_old10', 		'254', 	'165', 	'0', 
-				'4', 		'MatureForest',			'1', 	'Riverbasins', 	'Countries', 				'0', 	'130', 	'0', 
-				'5', 		'YoungForest',			'1', 	'Countries', 	'Countries', 				'0', 	'160', 	'0', 
-				'6', 		'Shrubs', 				'1', 	'Countries', 	null, 						'153', 	'204', 	'51', 
-				'7', 		'Herbaceous', 			'1', 	'Countries', 	null,		 				'153', 	'166', 	'51', 
-				'8', 		'Bare', 				'0', 	'Countries', 	null,		 				'254', 	'254', 	'203', 
-				'9', 		'Snow', 				'0', 	'Countries', 	null,		 				'254', 	'254', 	'254', 
-				'10', 		'Wetland', 				'0', 	'Countries', 	null,		 				'0', 	'150', 	'160', 
-				'11', 		'Water', 				'0', 	'Countries', 	null,		 				'25', 	'25', 	'254',
-				'12', 		'Cocoa', 				'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'200', 	'80', 	'20', 
-				'13',		'HighInput_Cocoa',		'1',	'Riverbasins', 	'Ghana_Regions_old10',  	'254', 	'100', 	'0', 
-				'14', 		'NonCompliant_Cocoa',	'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'144', 	'70', 	'44', 
-				'15', 		'Exhausted_Cocoa', 		'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'155', 	'128', 	'110'
+				'4', 		'MatureForest',			'1', 	'Riverbasins', 	null, 						'0', 	'130', 	'0', 
+				//'5', 		'YoungForest',			'1', 	'Countries', 	'Countries', 				'0', 	'160', 	'0', 
+				'5', 		'Shrubs', 				'1', 	'Countries', 	null, 						'153', 	'204', 	'51', 
+				'6', 		'Herbaceous', 			'1', 	'Countries', 	null,		 				'153', 	'166', 	'51', 
+				'7', 		'Bare', 				'0', 	'Countries', 	null,		 				'254', 	'254', 	'203', 
+				'8', 		'Snow', 				'0', 	'Countries', 	null,		 				'254', 	'254', 	'254', 
+				'9', 		'Wetland', 				'0', 	'Countries', 	null,		 				'0', 	'150', 	'160', 
+				'10', 		'Water', 				'0', 	'Countries', 	null,		 				'25', 	'25', 	'254',
+				'11', 		'Cocoa', 				'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'200', 	'80', 	'20', 
+				'12',		'Rehabilitated_Cocoa',		'1',	'Riverbasins', 	'Ghana_Regions_old10',  	'254', 	'100', 	'0', 
+				'13', 		'NonCompliant_Cocoa',	'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'144', 	'70', 	'44', 
+				'14', 		'Exhausted_Cocoa', 		'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'155', 	'128', 	'110'
 			];
 		}
 	}
@@ -104,7 +111,11 @@ container Classifications
 		attribute<string> 			ModelClaimDef:	expr = "ModelType/ModelClaimDef[Nr_OrgEntity]";
 		attribute<uint32>   		Color: 			expr = "ModelType/Color[Nr_OrgEntity]", DialogType = "BrushColor";
 		attribute<bool>				isUrban:		expr = "id(.) = ParamConstants/Urban";
-		attribute<bool>				isActiveCocoa:  expr = "id(.) = ParamConstants/Cocoa || id(.) = ParamConstants/HighInput_Cocoa || id(.) = ParamConstants/NonCompliant_Cocoa";
+		attribute<bool>				isActiveCocoa:  expr = "id(.) = ParamConstants/Cocoa || id(.) = ParamConstants/Rehabilitated_Cocoa || id(.) = ParamConstants/NonCompliant_Cocoa";
+		
+		// yieldfactors set to the estimated differences between compliant (cocoa + Rehabilitated_Cocoa) and non-compliant (NonCompliant_Cocoa), offered by Ole Boysen on 14/7/25 (
+		attribute<float32> 			YieldFactor:= switch(case(id(.)=ParamConstants/Cocoa, 1.28f), case(id(.)=ParamConstants/Rehabilitated_Cocoa, 1.28f), case(id(.)=ParamConstants/NonCompliant_Cocoa, 1.0f), 0f);
+		
 		container ParamConstants: 	expr = "for_each_nedv(Name, 'uint8('+ string(id(.)) +')', void, uint8)";
 		unit<uint32> mt32:			expr = "range(uint32, 0, #ActiveModelTypes)" {
 			attribute<ActiveModelTypes>	OrgRef:	expr = "id(.)[ActiveModelTypes]";
@@ -118,7 +129,18 @@ container Classifications
 				|| (second_rel == ParamConstants/Exhausted_Cocoa)
 				|| (first_rel == ParamConstants/NonCompliant_Cocoa && second_rel == ParamConstants/Cocoa)
 				|| (second_rel == ParamConstants/NonCompliant_Cocoa && first_rel == ParamConstants/Cocoa);
+			attribute<bool> allowed:= 
+			! ( 
+					(first_rel == ParamConstants/Exhausted_Cocoa 	&& second_rel == ParamConstants/Cocoa)
+				|| 	(first_rel == ParamConstants/Exhausted_Cocoa 	&& second_rel == ParamConstants/NonCompliant_Cocoa) 
+				|| 	(first_rel == ParamConstants/Cocoa 				&& second_rel == ParamConstants/Rehabilitated_Cocoa)
+				|| 	(first_rel == ParamConstants/NonCompliant_Cocoa && second_rel == ParamConstants/Rehabilitated_Cocoa)
+			);
 			attribute<wpoint> uni_point:= point(first_rel[uint16], second_rel[uint16], wpoint);
+		}
+		unit<uint32> unallowed_transitions:= subset(!transitions/allowed) {
+			attribute<ActiveModelTypes> from:= transitions/first_rel[Nr_OrgEntity];
+			attribute<ActiveModelTypes> to:= transitions/second_rel[Nr_OrgEntity];
 		}
 	}
 	unit<uint8> Change:= range(uint8, uint8(0), uint8(4)) {
@@ -193,7 +215,7 @@ container Classifications
 		attribute<float32> 	min_age:= float32(id(.)) * 5f;
 		attribute<string> 	LabelText:= 'age_'+string(min_age);
 		//attribute<float32> 	cumu_break: [ 20f, 150f, 275f, 357f, 422f, 469f, 483f, 494f, 503f, 511f, 518f, 524f], 
-		attribute<float32> 	cumu_break: [ 20, 150, 275, 357, 422, 469, 483, 494, 503, 511, 518, 524], 
+		attribute<float32> 	cumu_break: [0, 20, 150, 275, 357, 422, 469, 483, 494, 503, 511, 518], 
 			Descr = "Cumulative breaks needed for random classification into cocoa age classes. 
 				Based on mean observed cocoa plantation age class sizes provided by Ole Boysen for all age classes aged 0-30. 
 				Extrapolated for older age classes using a power function for older age classes, which has been estimated on the 10-30 year old age classes and takes the form s= 1366.4x^-1.035"; 
@@ -212,4 +234,5 @@ container Classifications
 		attribute<bool>	   exhausted:= age > 10f && yield < 100f;
 		
 	}
+	
 }
