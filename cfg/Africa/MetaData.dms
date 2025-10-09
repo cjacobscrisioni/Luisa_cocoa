@@ -9,9 +9,20 @@ Container MetaData: Using = "Classifications;"
 	{
 		attribute<uint32> Year               := 2015 + (id(.)*5);
 		attribute<string> sYear              := 'y'+string(Year);
+		attribute<bool>   prev_was_first 	 := id(.)=1;
+		attribute<string> Label				 := sYear;
 		attribute<string> spopProjYear       := sYear;
 		attribute<uint32> Duration           := makedefined(Year - Year[sub_or_null(id(.), 1)], 0);
 		attribute<float32>Duration_densmodel := float32(Duration) / 5f;
+	}
+	
+	unit<uint32> TC_random := range(uint32, 0, 100) {
+		attribute<string> label:= id(.) = 0 ? 'Reference' : 'Random_'+string(id(.));
+	}
+	
+	unit<uint32> Periods_x_Random := combine(TC_random, Periods) {
+		attribute<string> Label:= Periods/sYear[second_rel]+'_'+TC_random/label[first_rel];
+		attribute<bool>	  Simulation:= second_rel > 0;
 	}
 	
 	unit<uint32> AllFactors: 		expr = "union_unit(StaticFactors, DynamicFactors, RegionalFactors)" 
@@ -163,7 +174,7 @@ Container MetaData: Using = "Classifications;"
 									);
 	}
 	
-	unit<uint32> Proto_StaticFactors: NrOfRows = 64
+	unit<uint32> Proto_StaticFactors: NrOfRows = 65
 	{
 		parameter<uint32> NrAttributes := 3;
 		
@@ -189,6 +200,7 @@ Container MetaData: Using = "Classifications;"
 			'scaled_tt_settlement',		'min_elem((tt_settlement - min(tt_settlement)) / rth_element(tt_settlement, 0.95f), 1f)', 'float32',
 			'inv_scaled_tt_settlement',	'1f - scaled_tt_settlement', 'float32',
 			'sca_tt_settlement',		 'rescale(scaled_tt_settlement, 0.99f, 1.2f)', 'float32',
+			'inv_sca_tt_settlement',	 'rescale(inv_scaled_tt_settlement, 0.99f, 1.2f)', 'float32',
 			'GHS_Pop_90', 				'float32(max_elem(LoadSpatialData/GHS_Pop_90/inFile/ReadData, int32(0)))', 'float32',
 			'GHS_Pop_00', 				'float32(max_elem(LoadSpatialData/GHS_Pop_00/inFile/ReadData, int32(0)))', 'float32',
 			'GHS_Pop_15', 				'float32(max_elem(LoadSpatialData/GHS_Pop_15/inFile/ReadData, int32(0)))', 'float32',

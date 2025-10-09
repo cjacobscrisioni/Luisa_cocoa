@@ -28,7 +28,7 @@ container Africa_Cacao
 {
 	container RunSettings 
 	{
-		parameter<Scenarios> ScenarioId            	:= 4[Scenarios];
+		parameter<Scenarios> ScenarioId            	:= 3[Scenarios]; //4[Scenarios] = BAU SSP2, 5[Scenarios] = EUDR_0
 		parameter<string> 	 ScenarioName			:= Scenarios/LabelText[ScenarioId];
 		parameter<bool>		 ForestProtection		:= Cocoa_Scenarios/ForestProtection[Scenarios/second_rel[ScenarioId]];
 		parameter<string>    SSP_ScenarioName       := SSP_Scenarios/SocioEconomicAssumptions[Scenarios/first_rel[ScenarioId]];
@@ -40,7 +40,7 @@ container Africa_Cacao
 		container PopulationProjections    := ='BaseData/LoadCsvFiles/Pop_projections_'+SSP_ScenarioName;
 		container GDPProjections           := ='BaseData/LoadCsvFiles/GDP_projections_'+SSP_ScenarioName;
 		container AgricultureProjections   := ='BaseData/LoadCsvFiles/'+Agric_ScenarioName;
-		container CocoaProjections		   := ='BaseData/LoadCsvFiles/'+Cocoa_ScenarioName;
+		//container CocoaProjections		   := ='BaseData/LoadCsvFiles/'+Cocoa_ScenarioName;
 		
 		unit<uint32> Scenarios := combine(SSP_Scenarios, Cocoa_Scenarios) {
 			attribute<string> LabelText:= SSP_Scenarios/LabelText[first_rel]+'_'+Cocoa_Scenarios/LabelText[second_rel];
@@ -49,19 +49,25 @@ container Africa_Cacao
 			attribute<uint32> NPV_foot:= Cocoa_Scenarios/NPV_foot[second_rel];
 		}
 		
-		unit<uint32> SSP_Scenarios : NrOfRows = 5 
+		/*unit<uint32> SSP_Scenarios : NrOfRows = 5 
 		{
 			attribute<string> SocioEconomicAssumptions := 'SSP'+string(id(.)+1);
 			attribute<string> LabelText                := SocioEconomicAssumptions, DialogType = "LabelText";
+		}*/
+		unit<uint32> SSP_Scenarios : NrOfRows = 1 
+		{
+			attribute<string> SocioEconomicAssumptions : ['SSP2'];
+			attribute<string> LabelText                := SocioEconomicAssumptions, DialogType = "LabelText";
 		}
-		unit<uint32> Cocoa_Scenarios: NrOfRows = 3 {
-			attribute<string> LabelText: ['Cocoa_static', 'Cocoa_uncons_bau', 'EUDR_0'];
-			attribute<string> AgricClaim: ['Agric_static', 'Agric_LID', 'Agric_LID'];
+		unit<uint32> Cocoa_Scenarios: NrOfRows = 5 {
+			attribute<string> LabelText: ['Cocoa_static', 'Cocoa_uncons_bau', 'EUDR_0', 'Cocoa_cons_BAU', 'EUDR_0_cons'];
+			attribute<string> AgricClaim: ['Agric_static', 'Agric_LID', 'Agric_LID', 'Agric_LID', 'Agric_LID'];
 			attribute<bool>	  ForestProtection:= id(.) = 2 || id(.) = 4;
-			attribute<bool>   Unconstrained:= id(.) >= 1;
-			attribute<bool>   MaintainYields:= id(.) = 0; // selects scenarios in which future yields are aggregated and maintained at the regional level. Problematic in case of forest protection.
+			attribute<bool>   Unconstrained:= const(TRUE,.,bool);
+			attribute<bool>   MaintainYields:= id(.) = 0 || id(.) > 2; // selects scenarios in which future yields are aggregated and maintained at the regional level. Problematic in case of forest protection.
 			attribute<bool>   RevenueModification:= pcount(cocoa_revenue_modifiers/revenue_inputs/Scenario_rel) > 0;
 			attribute<uint32> NPV_foot:= const(25,.,uint32);
+			attribute<float32> Cocoa_growth_annual_max:= const(((2.7f - 1.9f) / 1.9f) / 19f,.,float32);
 		}
 		
 		#include<Cocoa_revenue_modifiers.dms>
@@ -71,7 +77,7 @@ container Africa_Cacao
 	{
 		parameter<uint8> Cocoa_Threshold := 50b; //percentage of a cell that has to be cocoa for it to be considered cocoa. (10m --> 100m aggregation)
 		parameter<uint8> Landuse_Threshold := 50b; //percentage of a cell that has to be cocoa for it to be considered cocoa. (10m --> 100m aggregation)
-		parameter<float32> BaseMap_Compliant_Cocoa_fraction := 0.49f, descr = "Fraction of cocoa considered certified and traceable, so very close to actual compliance. Estimate offered by Ole Boysen, 6/5/2025.";
+		parameter<float32> BaseMap_Compliant_Cocoa_fraction := 0.49f / Classifications/ActiveModelTypes/YieldFactor[Classifications/ActiveModelTypes/ParamConstants/Cocoa], descr = "Fraction of cocoa *output* considered certified and traceable, so very close to actual compliance. Estimate offered by Ole Boysen, 6/5/2025.";
 	}
 	
 	#include<Classifications.dms>
@@ -166,14 +172,14 @@ container Africa_Cacao
 			, 'CountryGroupT('+string(id(geometries/CountryGroup))+'[geometries/CountryGroup])'
 		);
 	
-	container ResultsGathering 
+	/*container ResultsGathering 
 	{
 		attribute<Classifications/ModelType> BaseMap (Geometries/SelectedTiledRaster1k) := = 
 			'raster_merge(
 				invert(id(BaseData/BoundarySets/BoundaryDomains16/MozaikRegions))[BaseData/BoundarySets/RasterSets1k_16/MozaikRegions]
 				,Classifications/ModelType
 				,'+ AsItemList(geometries/CountryGroup/select ? 'PerCountryGroup/'+geometries/CountryGroup/name+'/VariablePreparation/baseMap_io/readLandUse' : '')+
-			')', StorageName = "= '%LocalDataProjDir%/landuse_2012.tif'" 
+			')', StorageName = "= '%LocalDataProjDir%/landuse_2015.tif'" 
 			{
 				attribute<UInt32> PaletteData (Classifications/ModelType) := Classifications/ModelType/Color; 
 			}
@@ -229,7 +235,7 @@ container Africa_Cacao
 					, '%LocalDataProjDir%/'+RunSettings/ScenarioName+'/pop_'+string(MetaData/Periods/Year)+'.tif'
 				);
 		}
-	}
+	}*/
 	#include<GHA_calibration.dms>
 	#include<ModelTemplate.dms>
 	
@@ -600,9 +606,15 @@ container Africa_Cacao
 				attribute<AtomicRegions> ID: 					= ID(AtomicRegions);
 				attribute<bool>			 error (AllocDomain): 	= IsNull(UnionData);
 			}
-			Container TransitionCosts := = ExistingFile('x:/x','%ProjDir%/parameters/TransitionCosts/'+ name +'.csv') = 'x:/x' 
+/*			Container TransitionCosts := = ExistingFile('x:/x','%ProjDir%/parameters/TransitionCosts/'+ name +'.csv') = 'x:/x' 
 				? 'BaseData/LoadCsvFiles/General_transition_costs' 
-				: 'Templates/loadDataFile_csv('+quote('%ProjDir%/parameters/TransitionCosts/'+name)+', Classifications/ModelledTransitions,'+quote('Transition')+')';
+				: 'Templates/loadDataFile_csv('+quote('%ProjDir%/parameters/TransitionCosts/'+name)+', Classifications/ModelledTransitions,'+quote('Transition')+')';*/
+			
+			#include<TransitionCosts.dms>
+			
+
+			
+				
 			Container Revenues := = ExistingFile('x:/x','%ProjDir%/parameters/Revenues/'+ name +'.csv') = 'x:/x' 
 				? 'BaseData/LoadCsvFiles/General_revenues' 
 				: 'Templates/loadDataFile_csv('+quote('%ProjDir%/parameters/Revenues/'+name)+', Classifications/ActiveModelTypes/mt32,'+quote('Class')+')';
@@ -615,14 +627,18 @@ container Africa_Cacao
 		}
 		Container ModelIterations: 	= 
 			for_each_ne(
-				id(MetaData/Periods) > 0 ? MetaData/Periods/sYear : ''
-				, 'ModelIterationSchemes/ModelT(AllocDomain, domain_1k, Classifications/ActiveModelTypes, Classifications/ModelType, ModellingRules, '+string(id(MetaData/Periods))+'[MetaData/Periods])'
+				MetaData/Periods_x_Random/Simulation ? MetaData/Periods_x_Random/Label : ''
+				, 'ModelIterationSchemes/ModelT(AllocDomain, domain_1k, Classifications/ActiveModelTypes, Classifications/ModelType, ModellingRules, '+string(id(MetaData/Periods_x_Random))+'[MetaData/Periods_x_Random])'
 			) 
 		{
 			container InitialState:= y2015/ResultingState;
+			container GenButton {
+				attribute<bool> store_all (MetaData/TC_Random):= = 'union_data(MetaData/TC_Random, '+asitemlist('y2050_'+MetaData/TC_Random/label+'/ResultingState/cumu_store')+')';
+			}
 			container y2015: Using = "ModelIterationSchemes;" 
 			{
 				parameter<MetaData/Periods> PeriodId := 0; 
+				parameter<MetaData/TC_Random> RandomId :=0;
 				unit<uint64> domain: 			= AllocDomain;
 				unit<uint8> ModelType: 			= Classifications/ActiveModelTypes;
 				unit<uint8> ViewType:			= Classifications/ModelType;
@@ -663,10 +679,28 @@ container Africa_Cacao
 					attribute<float32>	 Qi		 (domain_1k): 		= PopulationDistribution/Qi[domain/BaseGrid];
 					attribute<Classifications/cocoa_tree_age> cocoa_age (domain_1k):= isActiveCocoa || LandUse==ModelType/ParamConstants/Exhausted_Cocoa ? classify(Age_LU, Classifications/cocoa_tree_age/Age) : const(0 / 0, domain_1k, Classifications/cocoa_tree_age);
 					
-					parameter<float32>   cocoa_yield:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)]));
-					parameter<float32>   cocoa_yield_15y:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age) + 15f, Classifications/cocoa_tree_age/age)]));
-					parameter<float32>	 avg_cocoa_suit:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa)) / sum(float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa));
+					//parameter<float32>   cocoa_yield:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)]));
+					//parameter<float32>   cocoa_yield_15y:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age) + 15f, Classifications/cocoa_tree_age/age)]));
+					//parameter<float32>	 avg_cocoa_suit:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa)) / sum(float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa));
 					
+					container cocoa_yields_npv:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
+						string(Classifications/ActiveCocoaTypes/YieldFactor)+'f * sum(max_elem(Context/StaticGridFactors/mod_perc_cocoa_climate_suit, 0f) * 
+							float32(LandUse = '+string(Classifications/ActiveCocoaTypes/Nr_OrgEntity)+'[ModelType]) *
+							(Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)])
+						)', void, float32) {
+							parameter<float32> all:= ='add('+asitemlist(Classifications/ActiveCocoaTypes/Label)+')';
+						}
+					container cocoa_yields_npv_15y:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
+						string(Classifications/ActiveCocoaTypes/YieldFactor)+'f * sum(max_elem(Context/StaticGridFactors/mod_perc_cocoa_climate_suit, 0f) * 
+							float32(LandUse = '+string(Classifications/ActiveCocoaTypes/Nr_OrgEntity)+'[ModelType]) *
+							(Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age) + 15f, Classifications/cocoa_tree_age/age)])
+						)', void, float32) {
+							parameter<float32> all:= ='add('+asitemlist(Classifications/ActiveCocoaTypes/Label)+')';
+						}
+					container avg_cocoa_suit:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
+						'makedefined(sum(max_elem(Context/StaticGridFactors/mod_perc_cocoa_climate_suit, 0f) * float32(LandUse = '+string(Classifications/ActiveCocoaTypes/Nr_OrgEntity)+'[ModelType])) /
+							sum(float32(LandUse = '+string(Classifications/ActiveCocoaTypes/Nr_OrgEntity)+'[ModelType])), 1f)', void, float32);
+				
 					parameter<bool> cumu_store:= True, explicitsuppliers = "ExportResults/store;";
 					container Context:			= VariablePreparation/Context;
 					container RegionalFactors:	= Context/RegionalFactors;
@@ -693,9 +727,16 @@ container Africa_Cacao
 				Container ExportResults := ModelIterationSchemes/ExportResultsT(domain_1k, Classifications/ModelType, Boundaries/UnitSets16, Boundaries/RasterSets16, ResultingState);
 			}
 		}
+		container ResultsCollection:= for_each_ne(MetaData/TC_Random/label, 'ResultsCollection_T('+string(id(MetaData/TC_Random))+')') {
+			container gen_button {
+				attribute<bool> run (MetaData/TC_Random):= ='union_data(MetaData/TC_Random,'+AsitemList(MetaData/TC_Random/label+'/store_cocoa_totals')+')';
+			}
+		}
+		Template ResultsCollection_T
+		{	
+			
+			parameter<MetaData/TC_random> RandomId:= 0;
 		
-		Container ResultsCollection 
-		{
 			//parameter<bool> LU_Q_A_stats:= True, ExplicitSuppliers = "= AsList('ModelIterations/'+MetaData/Periods/sYear+'/ExportResults/LU_Q_A', ';') + ';AggregateStatistics;'";
 			
 			unit<uint32> years:= MetaData/Periods, Using = "AggregateStatistics";
@@ -704,7 +745,8 @@ container Africa_Cacao
 			
 			
 			parameter<string> period_stats_string                         := AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/LANDUSE');
-			attribute<string> lu_refs (years):= 'ModelIterations/'+years/sYear+'/ExportResults/results_ReadOnly/LandUseVT';
+			
+			attribute<string> lu_refs (years):= 'ModelIterations/'+years/sYear+(id(years) = 0 ? '' : '_'+MetaData/TC_random/label[RandomId])+'/ExportResults/results_ReadOnly/LandUseVT';
 			attribute<string> lu_stats_string (Classifications/ModelType) := = 'replace(period_stats_string, '+quote('LANDUSE')+', Classifications/ModelType/Name)';
 			
 			parameter<bool> store_cocoa_totals:= True, ExplicitSuppliers = 
@@ -717,7 +759,7 @@ container Africa_Cacao
 
 			container transitions:= for_each_nedv(MetaData/Periods/sYear, 
 				'pcount(rlookup(point(all_landuse_results/y2015[uint32], all_landuse_results/'+MetaData/Periods/sYear+'[uint32], upoint), ModelType/transition_matrix/unipt))',
-				ModelType/transition_matrix, uint64), StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/transition_matrices.csv'", StorageType = "gdalwrite.vect" {
+				ModelType/transition_matrix, uint64), StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/transition_matrices.csv'", StorageType = "gdalwrite.vect" {
 					attribute<string> from (ModelType/transition_matrix):= ModelType/transition_matrix/from;
 					attribute<string> to (ModelType/transition_matrix):= ModelType/transition_matrix/to;
 				}
@@ -738,17 +780,17 @@ container Africa_Cacao
 			container total_cocoa:= for_each_nedv(MetaData/Periods/sYear
 				, 'sum(uint32(Classifications/ModelType/isActiveCocoa[all_landuse_results/'+MetaData/Periods/sYear+']), Boundaries/RasterSets16/Ghana_Regions_old10)'
 				, Ghana_Regions_old10, uint32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_cocoa.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_total_cocoa.csv'", StorageType = "gdalwrite.vect" 
 			{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
 			container total_compliant_cocoa:= for_each_nedv(MetaData/Periods/sYear
 				, 'sum(uint32(all_landuse_results/'+MetaData/Periods/sYear+' = Classifications/ModelType/ParamConstants/Cocoa || all_landuse_results/'+MetaData/Periods/sYear+' = Classifications/ModelType/ParamConstants/Rehabilitated_Cocoa ), Boundaries/RasterSets16/Ghana_Regions_old10)'
 				, Ghana_Regions_old10, uint32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_compliant_cocoa.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_total_compliant_cocoa.csv'", StorageType = "gdalwrite.vect" 
 			{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
 			container total_non_compliant_cocoa:= for_each_nedv(MetaData/Periods/sYear
 				, 'sum(uint32(all_landuse_results/'+MetaData/Periods/sYear+' = Classifications/ModelType/ParamConstants/NonCompliant_Cocoa), Boundaries/RasterSets16/Ghana_Regions_old10)'
 				, Ghana_Regions_old10, uint32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_non_compliant_cocoa.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_total_non_compliant_cocoa.csv'", StorageType = "gdalwrite.vect" 
 			{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
 			
 			
@@ -756,55 +798,55 @@ container Africa_Cacao
 			container total_crops:= for_each_nedv(MetaData/Periods/sYear
 				, 'sum(uint32(all_landuse_results/'+MetaData/Periods/sYear+' = Classifications/ModelType/ParamConstants/Crops), Boundaries/RasterSets16/Ghana_Regions_old10)'
 				,Ghana_Regions_old10,uint32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_crops.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_total_crops.csv'", StorageType = "gdalwrite.vect" 
 				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
 				
 			container total_mature_forest:= for_each_nedv(MetaData/Periods/sYear
 				, 'sum(uint32(all_landuse_results/'+MetaData/Periods/sYear+' = Classifications/ModelType/ParamConstants/MatureForest), Boundaries/RasterSets16/Ghana_Regions_old10)'
 				, Ghana_Regions_old10, uint32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_mature_forest.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_total_mature_forest.csv'", StorageType = "gdalwrite.vect" 
 				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
 				
 			container total_forest_loss:= for_each_nedv(MetaData/Periods/sYear
 				, 'sum(matureforest_lost/'+MetaData/Periods/sYear+', Boundaries/RasterSets16/Ghana_Regions_old10)'
 				, Ghana_Regions_old10, uint32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_forest_loss.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_total_forest_loss.csv'", StorageType = "gdalwrite.vect" 
 				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
 				
 			container total_cocoa_in_protected_area:= for_each_nedv(MetaData/Periods/sYear
 				, 'sum(cocoa_in_protected_areas/'+MetaData/Periods/sYear+', Boundaries/RasterSets16/Ghana_Regions_old10)'
 				, Ghana_Regions_old10, uint32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_total_cocoa_protected_area.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_total_cocoa_protected_area.csv'", StorageType = "gdalwrite.vect" 
 				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
 			
 			container summed_forest_loss_by_cocoa:= for_each_nedv(MetaData/Periods/sYear
 				, 'sum(matureforest_to_cocoa/'+MetaData/Periods/sYear+', Boundaries/RasterSets16/Ghana_Regions_old10)'
 				, Ghana_Regions_old10, uint32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_summed_forest_loss_by_cocoa.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_summed_forest_loss_by_cocoa.csv'", StorageType = "gdalwrite.vect" 
 				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
 						
 			container summed_othercrops_loss_by_cocoa:= for_each_nedv(MetaData/Periods/sYear
 				, 'sum(othercrops_to_cocoa/'+MetaData/Periods/sYear+', Boundaries/RasterSets16/Ghana_Regions_old10)'
 				, Ghana_Regions_old10, uint32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_summed_othercrops_loss_by_cocoa.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_summed_othercrops_loss_by_cocoa.csv'", StorageType = "gdalwrite.vect" 
 				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
 				
 			container summed_cocoa_yield:= for_each_nedv(MetaData/Periods/sYear
-				, 'sum(max_elem(ModelIterations/'+MetaData/Periods/sYear+'/ExportResults/results_ReadOnly/Cocoa_Yield, 0f), Boundaries/RasterSets16/Ghana_Regions_old10)'
+				, 'sum(max_elem(ModelIterations/'+MetaData/Periods/sYear+(id(years) = 0 ? '' : '_'+MetaData/TC_random/label[RandomId])+'/ExportResults/results_ReadOnly/Cocoa_Yield, 0f), Boundaries/RasterSets16/Ghana_Regions_old10)'
 				, Ghana_Regions_old10, float32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_summed_cocoa_yield.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_summed_cocoa_yield.csv'", StorageType = "gdalwrite.vect" 
 				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
 			
 			container summed_compliant_cocoa_yield:= for_each_nedv(MetaData/Periods/sYear
-				, 'sum(max_elem(ModelIterations/'+MetaData/Periods/sYear+'/ExportResults/results_ReadOnly/Compliant_Cocoa_Yield, 0f), Boundaries/RasterSets16/Ghana_Regions_old10)'
+				, 'sum(max_elem(ModelIterations/'+MetaData/Periods/sYear+(id(years) = 0 ? '' : '_'+MetaData/TC_random/label[RandomId])+'/ExportResults/results_ReadOnly/Compliant_Cocoa_Yield, 0f), Boundaries/RasterSets16/Ghana_Regions_old10)'
 				, Ghana_Regions_old10, float32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_summed_compliant_cocoa_yield.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_summed_compliant_cocoa_yield.csv'", StorageType = "gdalwrite.vect" 
 				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}
 			
 			container summed_noncompliant_cocoa_yield:= for_each_nedv(MetaData/Periods/sYear
-				, 'sum(max_elem(ModelIterations/'+MetaData/Periods/sYear+'/ExportResults/results_ReadOnly/NonCompliant_Cocoa_Yield, 0f), Boundaries/RasterSets16/Ghana_Regions_old10)'
+				, 'sum(max_elem(ModelIterations/'+MetaData/Periods/sYear+(id(years) = 0 ? '' : '_'+MetaData/TC_random/label[RandomId])+'/ExportResults/results_ReadOnly/NonCompliant_Cocoa_Yield, 0f), Boundaries/RasterSets16/Ghana_Regions_old10)'
 				, Ghana_Regions_old10, float32)
-				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/_summed_noncompliant_cocoa_yield.csv'", StorageType = "gdalwrite.vect" 
+				, StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/_summed_noncompliant_cocoa_yield.csv'", StorageType = "gdalwrite.vect" 
 				{attribute<string> ZoneId (Ghana_Regions_old10):= Boundaries/UnitSets16/Ghana_Regions_old10/ZoneId;}			
 				
 			container AggregateStatistics:= 
@@ -813,18 +855,18 @@ container Africa_Cacao
 					, 'union_data(years,'+lu_stats_string+')'
 					, years
 					, uint32
-					, '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'
+					, '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/results/runstats.dbf'
 				)
 						{
-				attribute<string>   ZoneId   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/ZoneId')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
-				attribute<uint32>   Year     (years) := years/Year,                                                                                                   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
-				attribute<int32>    Pop      (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/Pop')+')',      StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
-				attribute<int32>    UrbanPop (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/UrbanPop')+')', StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
-				attribute<int32>    PD05th   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/PD05th')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
-				attribute<float32>  PDmean   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/PDmean')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
-				attribute<int32>    PD95th   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/PD95th')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
-				attribute<float32>  wNE      (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/wNE')+')',      StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
-				attribute<float32>  wTransP  (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/wTransP')+')',  StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/results/runstats.dbf'";
+				attribute<string>   ZoneId   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/ZoneId')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/results/runstats.dbf'";
+				attribute<uint32>   Year     (years) := years/Year,                                                                                                   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/results/runstats.dbf'";
+				attribute<int32>    Pop      (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/Pop')+')',      StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/results/runstats.dbf'";
+				attribute<int32>    UrbanPop (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/UrbanPop')+')', StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/results/runstats.dbf'";
+				attribute<int32>    PD05th   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/PD05th')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/results/runstats.dbf'";
+				attribute<float32>  PDmean   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/PDmean')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/results/runstats.dbf'";
+				attribute<int32>    PD95th   (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/PD95th')+')',   StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/results/runstats.dbf'";
+				attribute<float32>  wNE      (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/wNE')+')',      StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/results/runstats.dbf'";
+				attribute<float32>  wTransP  (years) := = 'union_data(years,'+AsItemList('ModelIterations/'+years/sYear+'/ExportResults/countrytotals/wTransP')+')',  StorageName = "= '%localDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/results/runstats.dbf'";
 			}
 		}
 		Container VariablesExport:= 

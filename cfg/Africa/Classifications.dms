@@ -96,9 +96,9 @@ container Classifications
 				'8', 		'Snow', 				'0', 	'Countries', 	null,		 				'254', 	'254', 	'254', 
 				'9', 		'Wetland', 				'0', 	'Countries', 	null,		 				'0', 	'150', 	'160', 
 				'10', 		'Water', 				'0', 	'Countries', 	null,		 				'25', 	'25', 	'254',
-				'11', 		'Cocoa', 				'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'200', 	'80', 	'20', 
-				'12',		'Rehabilitated_Cocoa',		'1',	'Riverbasins', 	'Ghana_Regions_old10',  	'254', 	'100', 	'0', 
-				'13', 		'NonCompliant_Cocoa',	'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'144', 	'70', 	'44', 
+				'11', 		'Cocoa', 				'1', 	'Riverbasins', 	'Countries',  				'200', 	'80', 	'20', 
+				'12',		'Rehabilitated_Cocoa',	'1',	'Riverbasins', 	'Countries',  				'254', 	'100', 	'0', 
+				'13', 		'NonCompliant_Cocoa',	'1', 	'Riverbasins', 	'Countries',  				'144', 	'70', 	'44', 
 				'14', 		'Exhausted_Cocoa', 		'1', 	'Riverbasins', 	'Ghana_Regions_old10',  	'155', 	'128', 	'110'
 			];
 		}
@@ -143,6 +143,11 @@ container Classifications
 			attribute<ActiveModelTypes> to:= transitions/second_rel[Nr_OrgEntity];
 		}
 	}
+	unit<uint8> ActiveCocoaTypes:= subset(ActiveModelTypes/isActiveCocoa) {
+		attribute<string> Label:= ActiveModelTypes/Name[Nr_OrgEntity];
+		attribute<float32> YieldFactor:= ActiveModelTypes/YieldFactor[Nr_OrgEntity];
+	}
+	
 	unit<uint8> Change:= range(uint8, uint8(0), uint8(4)) {
 		attribute<string> Name: 	['Irrelevant', 'Not_changed', 'New', 'Gone'];
 		attribute<uint32> R: 		[255,	128,	255,	0];

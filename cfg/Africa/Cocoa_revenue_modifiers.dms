@@ -13,7 +13,7 @@ container cocoa_revenue_modifiers {
 	
 	
 	
-	unit<uint32> revenue_inputs: nrofrows = 4 {
+	unit<uint32> revenue_inputs: nrofrows = 8 {
 		
 		//
 		
@@ -31,7 +31,11 @@ container cocoa_revenue_modifiers {
 				'Crops', 				'EUDR_0', '0.33464201',
 				'NonCompliant_Cocoa', 	'EUDR_0', '8.85902963',
 				'Cocoa', 				'EUDR_0', '27.2287032',
-				'Rehabilitated_Cocoa', 		'EUDR_0', '27.2287032'
+				'Rehabilitated_Cocoa', 		'EUDR_0', '27.2287032',
+				'Crops', 				'EUDR_0_cons', '0.33464201',
+				'NonCompliant_Cocoa', 	'EUDR_0_cons', '8.85902963',
+				'Cocoa', 				'EUDR_0_cons', '27.2287032',
+				'Rehabilitated_Cocoa', 	'EUDR_0_cons', '27.2287032'
 		];
 		}
 	}
