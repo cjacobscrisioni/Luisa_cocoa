@@ -315,6 +315,11 @@ container Africa_Cacao
 					attribute<UInt32> PaletteData(ModelType) := ModelType/Color; 
 				}
 				attribute<ModelType> readLandUse (domain_1k) : StorageName = "= '%LocalDataProjDir%/'+ name +'/BaseMap/landuse.tif'";
+				
+				// adhoc
+				parameter<float32> max_tt_cocoa:= max(float32(readLandUse = /Classifications/ModelType/ParamConstants/Cocoa) * StaticGridFactors/TravelTimeToCities);
+				parameter<float32> p99_cocoa:= rth_element(float32(readLandUse = /Classifications/ModelType/ParamConstants/Cocoa) * StaticGridFactors/TravelTimeToCities, 0.99f);
+				parameter<float32> p95_cocoa:= rth_element(float32(readLandUse = /Classifications/ModelType/ParamConstants/Cocoa) * StaticGridFactors/TravelTimeToCities, 0.95f);
 			}
 		}
 		
@@ -554,9 +559,9 @@ container Africa_Cacao
 					'add((-1.44957f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(0.540383f * float32(Context/StaticGridFactors/log_cocoa_climate_suit[domain/grid_rel])),(0.004552f * float32(Context/StaticGridFactors/rough[domain/grid_rel])),(-1.81802f * float32(Context/StaticGridFactors/inv_TT_Cities[domain/grid_rel])))',
 					'add((-30.7029f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/inv_TT_Cities[domain/grid_rel])),(0.0406735f * float32(Context/StaticGridFactors/EcoRegionId[domain/grid_rel])),(-0.000269197f * float32(Context/StaticGridFactors/GHS_dPop_00_15[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/MapSpam_arable[domain/grid_rel])),(0.00290447f * float32(Context/StaticGridFactors/MapSpam_permacrops[domain/grid_rel])),(-2.61705f * float32(Context/StaticGridFactors/relpotaccess_2000[domain/grid_rel])),(-0.0417677f * float32(Context/StaticGridFactors/crops_fract[domain/grid_rel])),(0.0940516f * float32(Context/StaticGridFactors/grass_fract[domain/grid_rel])),(-0.0637358f * float32(Context/StaticGridFactors/shrubs_fract[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/reltri[domain/grid_rel])),(-0.163286f * float32(Context/StaticGridFactors/w_shrubs_fract[domain/grid_rel])),(-16.2031f * float32(Context/StaticGridFactors/w_reltri[domain/grid_rel])),(0f * float32(Context/DynamicGridFactors/w_inv_TT_Cities[domain/grid_rel])))',
 					'add((2.98105f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(-3.25825f * float32(Context/StaticGridFactors/inv_TT_Cities[domain/grid_rel])),(-0.0109775f * float32(Context/StaticGridFactors/EcoRegionId[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/GHS_dPop_00_15[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/MapSpam_arable[domain/grid_rel])),(-0.0889089f * float32(Context/StaticGridFactors/MapSpam_permacrops[domain/grid_rel])),(0.457354f * float32(Context/StaticGridFactors/relpotaccess_2000[domain/grid_rel])),(-0.0433405f * float32(Context/StaticGridFactors/crops_fract[domain/grid_rel])),(0.103825f * float32(Context/StaticGridFactors/grass_fract[domain/grid_rel])),(-0.0259322f * float32(Context/StaticGridFactors/shrubs_fract[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/reltri[domain/grid_rel])),(-0.0386269f * float32(Context/StaticGridFactors/w_shrubs_fract[domain/grid_rel])),(-3.55014f * float32(Context/StaticGridFactors/w_reltri[domain/grid_rel])),(0f * float32(Context/DynamicGridFactors/w_inv_TT_Cities[domain/grid_rel])))',
-					'add((-1f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(Context/StaticGridFactors/mod_perc_cocoa_climate_suit[domain/grid_rel])))',
-					'add((-1f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(Context/DynamicGridFactors/ln_clim_suit_x_neighb_prob[domain/grid_rel])))',
-					'add((-1f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(Context/DynamicGridFactors/ln_clim_suit_x_neighb_prob[domain/grid_rel])))',
+					'add((-1f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(Context/StaticGridFactors/cocoa_rescaled_perc_suit[domain/grid_rel])))',
+					'(float32(PrevState/LandUse = ModelType/ParamConstants/Exhausted_Cocoa) * float32(Context/StaticGridFactors/cocoa_rescaled_perc_suit))[domain/grid_rel]',
+					'add((-1f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(Context/StaticGridFactors/cocoa_rescaled_perc_suit[domain/grid_rel])))',
 					'add((-10f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(20f * float32(Context/DynamicGridFactors/cocoa_exhausted[domain/grid_rel])))'				
 				];
 			}
@@ -579,8 +584,8 @@ container Africa_Cacao
 					'float32(Context/DynamicGridFactors/Constant[domain/grid_rel])',
 					'float32(Context/DynamicGridFactors/Constant[domain/grid_rel])',
 					'float32(Context/DynamicGridFactors/Constant[domain/grid_rel])',
-					'add((0f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(Context/StaticGridFactors/sca_tt_settlement[domain/grid_rel])))',
-					'add((0f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(Context/StaticGridFactors/sca_tt_settlement[domain/grid_rel])))',
+					'add((0f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(PrevState/LandUse[domain/grid_rel] = ModelType/ParamConstants/NonCompliant_Cocoa) * float32(Context/StaticGridFactors/scaled_cc_cost[domain/grid_rel])))',
+					'add((0f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(PrevState/LandUse[domain/grid_rel] = ModelType/ParamConstants/NonCompliant_Cocoa) * float32(Context/StaticGridFactors/scaled_cc_cost[domain/grid_rel])))',
 					'float32(Context/DynamicGridFactors/Constant[domain/grid_rel])',
 					'float32(Context/DynamicGridFactors/Constant[domain/grid_rel])'
 				];
@@ -677,23 +682,23 @@ container Africa_Cacao
 					attribute<float32>	 Si		 (domain_1k): 		= HousingStock/Si[domain/BaseGrid];
 					attribute<float32>	 Age_Si	 (domain_1k): 		= HousingStock/Age_Si[domain/BaseGrid];
 					attribute<float32>	 Qi		 (domain_1k): 		= PopulationDistribution/Qi[domain/BaseGrid];
-					attribute<Classifications/cocoa_tree_age> cocoa_age (domain_1k):= isActiveCocoa || LandUse==ModelType/ParamConstants/Exhausted_Cocoa ? classify(Age_LU, Classifications/cocoa_tree_age/Age) : const(0 / 0, domain_1k, Classifications/cocoa_tree_age);
+					attribute<Classifications/cocoa_tree_age> cocoa_age (domain_1k):= isActiveCocoa || LandUse==ModelType/ParamConstants/Exhausted_Cocoa ? classify(Age_LU, Classifications/cocoa_tree_age/Age) : max(id(Classifications/cocoa_tree_age));
 					
 					//parameter<float32>   cocoa_yield:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)]));
 					//parameter<float32>   cocoa_yield_15y:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age) + 15f, Classifications/cocoa_tree_age/age)]));
 					//parameter<float32>	 avg_cocoa_suit:= sum(max_elem(Context/StaticGridFactors/perc_cocoa_climate_suit, 0f) * float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa)) / sum(float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa));
 					
-					container cocoa_yields_npv:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
+					container cocoa_yields:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
 						string(Classifications/ActiveCocoaTypes/YieldFactor)+'f * sum(max_elem(Context/StaticGridFactors/mod_perc_cocoa_climate_suit, 0f) * 
 							float32(LandUse = '+string(Classifications/ActiveCocoaTypes/Nr_OrgEntity)+'[ModelType]) *
-							(Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)])
+							(Classifications/cocoa_tree_age/yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)])
 						)', void, float32) {
 							parameter<float32> all:= ='add('+asitemlist(Classifications/ActiveCocoaTypes/Label)+')';
 						}
-					container cocoa_yields_npv_15y:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
+					container cocoa_yields_15y:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
 						string(Classifications/ActiveCocoaTypes/YieldFactor)+'f * sum(max_elem(Context/StaticGridFactors/mod_perc_cocoa_climate_suit, 0f) * 
 							float32(LandUse = '+string(Classifications/ActiveCocoaTypes/Nr_OrgEntity)+'[ModelType]) *
-							(Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age) + 15f, Classifications/cocoa_tree_age/age)])
+							(Classifications/cocoa_tree_age/yield[classify(float32(cocoa_age) + 15f, Classifications/cocoa_tree_age/age)])
 						)', void, float32) {
 							parameter<float32> all:= ='add('+asitemlist(Classifications/ActiveCocoaTypes/Label)+')';
 						}

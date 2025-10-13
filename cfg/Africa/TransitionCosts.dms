@@ -107,8 +107,8 @@ container TransitionCosts {
 			'8',	'2',	'NonCompliant_Cocoa',	'PermanentCrops',	'214.922',
 			'8',	'3',	'NonCompliant_Cocoa',	'MatureForest',	'1000',
 			'8',	'4',	'NonCompliant_Cocoa',	'Shrubs',	'36.4526',
-			'8',	'5',	'NonCompliant_Cocoa',	'Herbaceous',	'36.4526',
-			'8',	'6',	'NonCompliant_Cocoa',	'Cocoa',	'50',
+			'8',	'5',	'NonCompliant_Cocoa',	'Herbaceous',	'36.4526', 
+			'8',	'6',	'NonCompliant_Cocoa',	'Cocoa',	'-87.892', // modified, as a test: cost-equivalent to remaining noncompliant (without factoring in transport costs)
 			'8',	'7',	'NonCompliant_Cocoa',	'Rehabilitated_Cocoa',	'1000',
 			'8',	'8',	'NonCompliant_Cocoa',	'NonCompliant_Cocoa',	'-112.892',
 			'8',	'9',	'NonCompliant_Cocoa',	'Exhausted_Cocoa',	'0',

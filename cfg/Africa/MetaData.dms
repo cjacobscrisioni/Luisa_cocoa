@@ -135,7 +135,7 @@ Container MetaData: Using = "Classifications;"
 			'rel_GHS_dBU_90_00_km120',	'StaticGridFactors/rel_GHS_dBU_90_00_km120', Null,
 			'cocoa_neighb_prob',		'proximity(is_cocoa, MetaData/Wij/cocoa_summation/Matr)', null,
 			'ln_clim_suit_x_neighb_prob','StaticGridFactors/log_cocoa_climate_suit * cocoa_neighb_prob', null,
-			'cocoa_exhausted',			'float32(Classifications/cocoa_tree_age/exhausted[PrevState/cocoa_age])', null
+			'cocoa_exhausted',			'float32(Classifications/cocoa_tree_age/exhausted[PrevState/cocoa_age] && ModelType/IsActiveCocoa[PrevState/LandUse])', null
 			];
 		}
 	}
@@ -174,7 +174,7 @@ Container MetaData: Using = "Classifications;"
 									);
 	}
 	
-	unit<uint32> Proto_StaticFactors: NrOfRows = 65
+	unit<uint32> Proto_StaticFactors: NrOfRows = 69
 	{
 		parameter<uint32> NrAttributes := 3;
 		
@@ -185,6 +185,9 @@ Container MetaData: Using = "Classifications;"
 			[
 			'Constant',					'const(1.0, domain_1k, float32)', 'float32',
 			'TravelTimeToCities',		'LoadSpatialData/TravelTimeToCities/inFile/ReadData > int32(-1) ? LoadSpatialData/TravelTimeToCities/inFile/ReadData : int32(0 / 0)', 'float32',
+			'cc_proto_prob',			'((-0.96f * (TravelTimeToCities / 60f)) + (0.58f * log(3.81f)))-0.86f', 'float32',
+			'cc_prob',					'exp(min_elem(cc_proto_prob, 80f)) / (1f + exp(min_elem(cc_proto_prob, 80f)))', 'float32',
+			'scaled_cc_cost',			'rescale(min_elem(60f - TravelTimeToCities, 0f), 0.25f, 1.0f)', 'float32',
 			'inv_TT_Cities',			'MakeDefined(float32(1) / (TravelTimeToCities + float32(1)))', 'float32',
 			'EcoRegionId',				'LoadSpatialData/Ecoregions/RasterIds', 'float32',
 			'GHS_BU_90', 				'float32(max_elem(LoadSpatialData/GHS_BU_90/inFile/ReadData, int32(0)))', 'float32',
@@ -245,6 +248,7 @@ Container MetaData: Using = "Classifications;"
 			'log_cocoa_climate_suit'	,'log(max_elem(float32(LoadSpatialData/cocoa_climate_suit_2016/inFile/ReadData), 0.01f))' 								,'float32',
 			'perc_cocoa_climate_suit'	,'min_elem(cocoa_climate_suit / rth_element(cocoa_climate_suit, 0.95f), 1f)' 											,'float32',
 			'mod_perc_cocoa_climate_suit','perc_cocoa_climate_suit < 0.2f ? 0f : perc_cocoa_climate_suit'														,'float32',
+			'cocoa_rescaled_perc_suit', 'rescale(mod_perc_cocoa_climate_suit, -5f, 5f)'																			,'float32',
 //			'sqr_cocoa_climate_suit'	,'sqr(float32(LoadSpatialData/cocoa_climate_suit_2016/inFile/ReadData))'			 									,'float32',
 			'log_slope'					,'log(max_elem(float32(LoadSpatialData/slope/inFile/ReadData), 0.01f))'														,'float32', 
 			'log_rough'					,'log(max_elem(float32(LoadSpatialData/roughness/inFile/ReadData), 0.01f))'													,'float32',
