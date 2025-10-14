@@ -1,4 +1,4 @@
-container Classifications
+container Classifications: using = "Units;"
 {
 	parameter<string> FilesPath := '%ProjDir%/Classification/' + RunSettings/ScenarioName;
 	
@@ -226,17 +226,18 @@ container Classifications
 				Extrapolated for older age classes using a power function for older age classes, which has been estimated on the 10-30 year old age classes and takes the form s= 1366.4x^-1.035"; 
 		attribute<float32>	rel_cumu_break:= cumu_break / max(cumu_break), Descr = "Cumulative breaks rescaled to 0-1 values";
 		
-		parameter<string> yieldcurve_eq3:= 'exp(1.6399f - (0.18f * age) + (2.924f * log(age + 0.01f)))'; // yield curve reschaled to zero to one value
+		parameter<string> yieldcurve_eq3:= 'exp(1.6399f - (0.18f * age[float32]) + (2.924f * log(age[float32] + 0.01f)))[yield_ha]'; // yield curve reschaled to zero to one value
 		
 	}
 	unit<uint32> cocoa_tree_age: nrofrows = 100 {
 		attribute<string> LabelText:= 'from_'+string(id(.)); 
-		attribute<float32> age:= float32(id(.));
-		attribute<float32> yield:= = cocoa_age_class/yieldcurve_eq3;
-		attribute<float32> cumuyield:= cumulate(yield);
+		attribute<Year> age:= id(.)[Year];
+		attribute<yield_ha> theoretical_yield:= = cocoa_age_class/yieldcurve_eq3;
+		attribute<yield_ha> yield:= = cocoa_age_class/yieldcurve_eq3;
+		attribute<yield_ha> cumuyield:= cumulate(yield);
 		attribute<float32> npv_yield:= cumuyield[min_elem(id(.)+RunSettings/Scenarios/NPV_foot[RunSettings/ScenarioId], #.-1)] - cumuyield;
 		attribute<float32> perc_npv_yield:= npv_yield / max(npv_yield);
-		attribute<bool>	   exhausted:= age > 10f && yield < 100f;
+		attribute<bool>	   exhausted:= age > 10f && yield < 50f;
 		
 	}
 	

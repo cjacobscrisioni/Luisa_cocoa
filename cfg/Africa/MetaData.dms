@@ -186,7 +186,7 @@ Container MetaData: Using = "Classifications;"
 			'Constant',					'const(1.0, domain_1k, float32)', 'float32',
 			'TravelTimeToCities',		'LoadSpatialData/TravelTimeToCities/inFile/ReadData > int32(-1) ? LoadSpatialData/TravelTimeToCities/inFile/ReadData : int32(0 / 0)', 'float32',
 			'cc_proto_prob',			'((-0.96f * (TravelTimeToCities / 60f)) + (0.58f * log(3.81f)))-0.86f', 'float32',
-			'cc_prob',					'exp(min_elem(cc_proto_prob, 80f)) / (1f + exp(min_elem(cc_proto_prob, 80f)))', 'float32',
+			'cc_prob',					'exp(min_elem(cc_proto_prob, 80f)) / (1f + exp(min_elem(cc_proto_prob, 80f))) + rnd_uniform(99, domain_1k, range(0f, 0.50f))', 'float32',
 			'scaled_cc_cost',			'rescale(min_elem(60f - TravelTimeToCities, 0f), 0.25f, 1.0f)', 'float32',
 			'inv_TT_Cities',			'MakeDefined(float32(1) / (TravelTimeToCities + float32(1)))', 'float32',
 			'EcoRegionId',				'LoadSpatialData/Ecoregions/RasterIds', 'float32',

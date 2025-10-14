@@ -2,18 +2,20 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 
-ssg<-TRUE #FALSE # store subgraphs of all randomized variants yes/no
+drive<-"D:/"
+
+ssg<-FALSE #FALSE # store subgraphs of all randomized variants yes/no
 
 #runset<-"SSP2_Cocoa_uncons_bau"
 runset<-"SSP2_Cocoa_cons_bau"
 #runset<-"SSP2_EUDR_0"
 #runset<-"SSP2_EUDR_0_cons"
 
-setwd(paste0("F:/LocalData/luisa_cocoa/GHA/",runset))
+setwd(paste0(drive,"LocalData/luisa_cocoa/GHA/",runset))
 #getwd()
 
-RandomVersions<-"Reference"
-#RandomVersions<-c("Reference", paste0('Random_', 1:99))
+#RandomVersions<-"Reference"
+RandomVersions<-c("Reference", paste0('Random_', 1:99))
 
 counter<-0
 
@@ -41,11 +43,11 @@ col_summing<-function(inframe) {
 
 for (randomval in RandomVersions) {
 
-outputdir<-paste0("F:/LocalData/luisa_cocoa/GHA/",runset,"/",randomval,"/graphs")
+outputdir<-paste0(drive,"LocalData/luisa_cocoa/GHA/",runset,"/",randomval,"/graphs")
 
 if(!dir.exists(outputdir)) {dir.create(outputdir)}
 
-setwd(paste0("F:/LocalData/luisa_cocoa/GHA/",runset,"/",randomval))
+setwd(paste0(drive,"LocalData/luisa_cocoa/GHA/",runset,"/",randomval))
 
 #--------- make cocoa totals graph
 all_cocoa<-read.csv("_total_cocoa.csv")
@@ -167,7 +169,7 @@ if(ssg) { # in case we want to graph all randomized results per region yes/no
 
 }
 
-outputdir<-paste0("F:/LocalData/luisa_cocoa/GHA/graphs")
+outputdir<-paste0(drive,"LocalData/luisa_cocoa/GHA/graphs")
 if(!dir.exists(outputdir)) {dir.create(outputdir)}
 
 aggset$rvf<-factor(aggset$rv)
