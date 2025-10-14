@@ -185,26 +185,37 @@ container ModelIterationSchemes {
 			
 			//parameter<float32>   cocoa_yield:= sum(Context/StaticGridFactors/mod_perc_cocoa_climate_suit * (Classifications/cocoa_tree_age/npv_yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)]));
 			//parameter<float32>	 avg_cocoa_suit:= sum(max_elem(Context/StaticGridFactors/mod_perc_cocoa_climate_suit, 0f) * float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa)) / sum(float32(LandUse == Classifications/ActiveModelTypes/ParamConstants/Cocoa));
-			container hectares:= for_each_nedv(ModelType/Name , 'LandUse = ModelType/ParamConstants/'+ ModelType/Name +' ? domain_1k/area_km2[ha] : 0[ha]', domain_1k , ha);
+			container hectares:= for_each_nedv(ModelType/Name , 'LandUse = ModelType/ParamConstants/'+ ModelType/Name +' ? domain_1k/area_km2[ha] : 0[ha]', domain_1k , ha) 
+			{attribute<ha> ActiveCocoa(domain_1k):= ='add('+AsItemList(ActiveCocoaTypes/Label)+')';}
+
 			container cocoa_yields:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
-				string(Classifications/ActiveCocoaTypes/YieldFactor)+'f * InitialState/Output_scaling * sum(max_elem(Context/StaticGridFactors/mod_perc_cocoa_climate_suit, 0f) * 
-					hectares/'+Classifications/ActiveCocoaTypes/Label+' * 
-					(Classifications/cocoa_tree_age/yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)])
-				)[tonne]', void, float32) {
+				string(Classifications/ActiveCocoaTypes/YieldFactor)+'f * (InitialState/Output_scaling * max_elem(Context/StaticGridFactors/mod_perc_cocoa_climate_suit, 0f) *
+				hectares/'+Classifications/ActiveCocoaTypes/Label+' * 
+				(Classifications/cocoa_tree_age/yield[classify(float32(cocoa_age), Classifications/cocoa_tree_age/age)])
+				)[tonne]', domain_1k, tonne) {
+					attribute<tonne> all (domain_1k):= ='add('+asitemlist(Classifications/ActiveCocoaTypes/Label)+')';
+				}
+			container cocoa_yields_15y:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
+				string(Classifications/ActiveCocoaTypes/YieldFactor)+'f * (InitialState/Output_scaling * max_elem(Context/StaticGridFactors/mod_perc_cocoa_climate_suit, 0f) *
+				hectares/'+Classifications/ActiveCocoaTypes/Label+' * 
+				(Classifications/cocoa_tree_age/yield[classify(float32(cocoa_age)+15f, Classifications/cocoa_tree_age/age)])
+				)[tonne]', domain_1k, tonne) {
+					attribute<tonne> all (domain_1k):= ='add('+asitemlist(Classifications/ActiveCocoaTypes/Label)+')';
+				}
+			container cocoa_output:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
+				'sum(cocoa_yields/'+Classifications/ActiveCocoaTypes/Label+')', void, float32) {
 					parameter<tonne> all:= ='add('+asitemlist(Classifications/ActiveCocoaTypes/Label)+')';
 					parameter<yield_ha> yield_per_ha:= all[kg] / sum(hectares/ActiveCocoa);
 				}
-			container cocoa_yields_15y:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
-				string(Classifications/ActiveCocoaTypes/YieldFactor)+'f * InitialState/Output_scaling * sum(max_elem(Context/StaticGridFactors/mod_perc_cocoa_climate_suit, 0f) * 
-					hectares/'+Classifications/ActiveCocoaTypes/Label+' * 
-					(Classifications/cocoa_tree_age/yield[classify(float32(cocoa_age) + 15f, Classifications/cocoa_tree_age/age)])
-				)[tonne]', void, float32) {
-					parameter<float32> all:= ='add('+asitemlist(Classifications/ActiveCocoaTypes/Label)+')';
-			}
+			container cocoa_output_15y:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
+				'sum(cocoa_yields_15y/'+Classifications/ActiveCocoaTypes/Label+')', void, float32) {
+					parameter<tonne> all:= ='add('+asitemlist(Classifications/ActiveCocoaTypes/Label)+')';
+					parameter<yield_ha> yield_per_ha:= all[kg] / sum(hectares/ActiveCocoa);
+				}
 			container avg_cocoa_suit:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
 				'makedefined(sum(max_elem(Context/StaticGridFactors/mod_perc_cocoa_climate_suit, 0f) * float32(LandUse = '+string(Classifications/ActiveCocoaTypes/Nr_OrgEntity)+'[ModelType])) /
 					sum(float32(LandUse = '+string(Classifications/ActiveCocoaTypes/Nr_OrgEntity)+'[ModelType])), 1f)', void, float32);
-			
+		
 			container Economy:			expr = "../Economy";
 			container Context:			expr = "../Context";
 			container RegionalFactors:	expr = "Context/RegionalFactors";
@@ -283,8 +294,8 @@ container ModelIterationSchemes {
 			attribute<float32>	TPi:						expr = "Context/DynamicGridFactors/TransportPerformance", StorageName = "= path + 'TPi.tif'", storagetype="gdalwrite.grid";
 			attribute<int32>  	UrbanPop:					expr = "LandUseVT = ViewType/paramconstants/Urban ? Qi : int32(0 / 0)";
 			attribute<float32>	Cocoa_Yield:				expr = "Compliant_Cocoa_Yield + NonCompliant_Cocoa_Yield", StorageName = "= path + '_AllCocoa_Yield.tif'", storagetype="gdalwrite.grid";
-			attribute<float32>	Compliant_Cocoa_Yield:		expr = "LandUseVT = ViewType/paramconstants/Cocoa || LandUseVT = ViewType/paramconstants/Rehabilitated_Cocoa ? ModelType/YieldFactor[LandUse] * Context/StaticGridFactors/mod_perc_cocoa_climate_suit * (Classifications/cocoa_tree_age/yield[classify(float32(ResultingState/cocoa_age), Classifications/cocoa_tree_age/age)]) : 0f", StorageName = "= path + '_CompliantCocoa_Yield.tif'", storagetype="gdalwrite.grid";
-			attribute<float32>	NonCompliant_Cocoa_Yield:	expr = "LandUseVT = ViewType/paramconstants/NonCompliant_Cocoa ? ModelType/YieldFactor[LandUse] * Context/StaticGridFactors/mod_perc_cocoa_climate_suit * (Classifications/cocoa_tree_age/yield[classify(float32(ResultingState/cocoa_age), Classifications/cocoa_tree_age/age)]) : 0f", StorageName = "= path + '_NonCompliant_Cocoa_Yield.tif'", storagetype="gdalwrite.grid";
+			attribute<float32>	Compliant_Cocoa_Yield:		expr = "ResultingState/cocoa_yields/Cocoa + ResultingState/cocoa_yields/Rehabilitated_Cocoa", StorageName = "= path + '_CompliantCocoa_Yield.tif'", storagetype="gdalwrite.grid";
+			attribute<float32>	NonCompliant_Cocoa_Yield:	expr = "ResultingState/cocoa_yields/NonCompliant_Cocoa", StorageName = "= path + '_NonCompliant_Cocoa_Yield.tif'", storagetype="gdalwrite.grid";
 		}
 		container cocoa_tree_ages:= for_each_nedva(/Classifications/cocoa_tree_age/LabelText, 'sum(uint32(ResultingState/cocoa_age = '+string(id(/Classifications/cocoa_tree_age))+'), ClaimRasters/Ghana_Regions_old10)', ClaimRegions/Ghana_regions_old10, uint32, path+'_cocoa_tree_age.dbf');
 		container countrytotals: expr = "for_each_nedv(ViewType/Name, 'sum(uint32(domain/LandUseVT = ViewType/paramconstants/'+ViewType/Name+'), ClaimRasters/Countries)', ClaimRegions/Countries, uint32)" {
