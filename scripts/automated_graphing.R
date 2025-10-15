@@ -255,5 +255,35 @@ fp+geom_line(alpha=0.5)+
   scale_size_manual(values=c(rep(0.5,99), 1.5))
 ggsave(paste(outputdir, "/yield_noncompliant_results_",runset,".png",sep=""), width=16, height=10)
 
+fp<-ggplot(data=aggset, aes(x=years+5, y=yieldsummed / (1000 * 1000), colour=rvf, size=rvf))
+fp+geom_line(alpha=0.5)+
+  xlab("Year") + ylab("Total cocoa output (M)") + ggtitle(paste0(runset, " scenario"))+
+  #coord_cartesian(ylim=c(0,1000))+
+  theme_light() +
+  theme(legend.position='none')+
+  scale_colour_manual(values=c(rep("gray",99), "black"))+
+  scale_size_manual(values=c(rep(0.5,99), 1.5))
+ggsave(paste(outputdir, "/output_all_",runset,".png",sep=""), width=16, height=10)
+
+fp<-ggplot(data=aggset, aes(x=years+5, y=compliantyieldsummed / (1000 * 1000), colour=rvf, size=rvf))
+fp+geom_line(alpha=0.5)+
+  xlab("Year") + ylab("Total compliant cocoa output (M)") + ggtitle(paste0(runset, " scenario"))+
+  #coord_cartesian(ylim=c(0,1000))+
+  theme_light() +
+  theme(legend.position='none')+
+  scale_colour_manual(values=c(rep("gray",99), "black"))+
+  scale_size_manual(values=c(rep(0.5,99), 1.5))
+ggsave(paste(outputdir, "/output_cc_",runset,".png",sep=""), width=16, height=10)
+
+fp<-ggplot(data=aggset, aes(x=years+5, y=noncompliantyieldsummed / (1000 * 1000), colour=rvf, size=rvf))
+fp+geom_line(alpha=0.5)+
+  xlab("Year") + ylab("Total non-compliant cocoa output (M)") + ggtitle(paste0(runset, " scenario"))+
+  #coord_cartesian(ylim=c(0,1000))+
+  theme_light() +
+  theme(legend.position='none')+
+  scale_colour_manual(values=c(rep("gray",99), "black"))+
+  scale_size_manual(values=c(rep(0.5,99), 1.5))
+ggsave(paste(outputdir, "/output_nc_",runset,".png",sep=""), width=16, height=10)
+
 refvals$years<-refvals$years+5
 write.csv(refvals, paste0(outputdir, "/all_outputs_", runset, ".csv"))
