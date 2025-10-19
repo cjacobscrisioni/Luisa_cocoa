@@ -28,7 +28,7 @@ container Africa_Cacao
 {
 	container RunSettings 
 	{
-		parameter<Scenarios> ScenarioId            	:= 3[Scenarios]; //4[Scenarios] = BAU SSP2, 5[Scenarios] = EUDR_0
+		parameter<Scenarios> ScenarioId            	:= 4[Scenarios]; //4[Scenarios] = BAU SSP2, 5[Scenarios] = EUDR_0
 		parameter<string> 	 ScenarioName			:= Scenarios/LabelText[ScenarioId];
 		parameter<bool>		 ForestProtection		:= Cocoa_Scenarios/ForestProtection[Scenarios/second_rel[ScenarioId]];
 		parameter<string>    SSP_ScenarioName       := SSP_Scenarios/SocioEconomicAssumptions[Scenarios/first_rel[ScenarioId]];
@@ -576,7 +576,7 @@ container Africa_Cacao
 					'add((-30.7029f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/inv_TT_Cities[domain/grid_rel])),(0.0406735f * float32(Context/StaticGridFactors/EcoRegionId[domain/grid_rel])),(-0.000269197f * float32(Context/StaticGridFactors/GHS_dPop_00_15[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/MapSpam_arable[domain/grid_rel])),(0.00290447f * float32(Context/StaticGridFactors/MapSpam_permacrops[domain/grid_rel])),(-2.61705f * float32(Context/StaticGridFactors/relpotaccess_2000[domain/grid_rel])),(-0.0417677f * float32(Context/StaticGridFactors/crops_fract[domain/grid_rel])),(0.0940516f * float32(Context/StaticGridFactors/grass_fract[domain/grid_rel])),(-0.0637358f * float32(Context/StaticGridFactors/shrubs_fract[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/reltri[domain/grid_rel])),(-0.163286f * float32(Context/StaticGridFactors/w_shrubs_fract[domain/grid_rel])),(-16.2031f * float32(Context/StaticGridFactors/w_reltri[domain/grid_rel])),(0f * float32(Context/DynamicGridFactors/w_inv_TT_Cities[domain/grid_rel])))',
 					'add((2.98105f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(-3.25825f * float32(Context/StaticGridFactors/inv_TT_Cities[domain/grid_rel])),(-0.0109775f * float32(Context/StaticGridFactors/EcoRegionId[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/GHS_dPop_00_15[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/MapSpam_arable[domain/grid_rel])),(-0.0889089f * float32(Context/StaticGridFactors/MapSpam_permacrops[domain/grid_rel])),(0.457354f * float32(Context/StaticGridFactors/relpotaccess_2000[domain/grid_rel])),(-0.0433405f * float32(Context/StaticGridFactors/crops_fract[domain/grid_rel])),(0.103825f * float32(Context/StaticGridFactors/grass_fract[domain/grid_rel])),(-0.0259322f * float32(Context/StaticGridFactors/shrubs_fract[domain/grid_rel])),(0f * float32(Context/StaticGridFactors/reltri[domain/grid_rel])),(-0.0386269f * float32(Context/StaticGridFactors/w_shrubs_fract[domain/grid_rel])),(-3.55014f * float32(Context/StaticGridFactors/w_reltri[domain/grid_rel])),(0f * float32(Context/DynamicGridFactors/w_inv_TT_Cities[domain/grid_rel])))',
 					'add((-1f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(Context/StaticGridFactors/cocoa_rescaled_perc_suit[domain/grid_rel])))',
-					'(float32(PrevState/LandUse = ModelType/ParamConstants/Exhausted_Cocoa) * float32(Context/StaticGridFactors/cocoa_rescaled_perc_suit))[domain/grid_rel]',
+					'add((-1f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(Context/StaticGridFactors/cocoa_rescaled_perc_suit[domain/grid_rel])))',
 					'add((-1f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(Context/StaticGridFactors/cocoa_rescaled_perc_suit[domain/grid_rel])))',
 					'add((-10f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(20f * float32(Context/DynamicGridFactors/cocoa_exhausted[domain/grid_rel])))'				
 				];
@@ -600,8 +600,8 @@ container Africa_Cacao
 					'float32(Context/DynamicGridFactors/Constant[domain/grid_rel])',
 					'float32(Context/DynamicGridFactors/Constant[domain/grid_rel])',
 					'float32(Context/DynamicGridFactors/Constant[domain/grid_rel])',
-					'add((0f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(PrevState/LandUse[domain/grid_rel] = ModelType/ParamConstants/NonCompliant_Cocoa) * float32(Context/StaticGridFactors/scaled_cc_cost[domain/grid_rel])))',
-					'add((0f * float32(Context/DynamicGridFactors/Constant[domain/grid_rel])),(1f * float32(PrevState/LandUse[domain/grid_rel] = ModelType/ParamConstants/NonCompliant_Cocoa) * float32(Context/StaticGridFactors/scaled_cc_cost[domain/grid_rel])))',
+					'add(float32(PrevState/LandUse[domain/grid_rel] <> ModelType/ParamConstants/NonCompliant_Cocoa),(1f * float32(PrevState/LandUse[domain/grid_rel] = ModelType/ParamConstants/NonCompliant_Cocoa) * float32(Context/StaticGridFactors/scaled_cc_cost[domain/grid_rel])))',
+					'add(float32(PrevState/LandUse[domain/grid_rel] <> ModelType/ParamConstants/Exhausted_Cocoa),(1f * float32(PrevState/LandUse[domain/grid_rel] = ModelType/ParamConstants/Exhausted_Cocoa) * (1f / float32(Context/StaticGridFactors/scaled_cc_cost[domain/grid_rel]))))',
 					'float32(Context/DynamicGridFactors/Constant[domain/grid_rel])',
 					'float32(Context/DynamicGridFactors/Constant[domain/grid_rel])'
 				];

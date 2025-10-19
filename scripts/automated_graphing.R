@@ -2,9 +2,9 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 
-drive<-"D:/"
+drive<-"F:/"
 
-ssg<-FALSE #FALSE # store subgraphs of all randomized variants yes/no
+ssg<-TRUE #FALSE # store subgraphs of all randomized variants yes/no
 
 #runset<-"SSP2_Cocoa_uncons_bau"
 runset<-"SSP2_Cocoa_cons_bau"
@@ -14,8 +14,8 @@ runset<-"SSP2_Cocoa_cons_bau"
 setwd(paste0(drive,"LocalData/luisa_cocoa/GHA/",runset))
 #getwd()
 
-#RandomVersions<-"Reference"
-RandomVersions<-c("Reference", paste0('Random_', 1:99))
+RandomVersions<-"Reference"
+#RandomVersions<-c("Reference", paste0('Random_', 1:99))
 
 counter<-0
 
@@ -69,9 +69,9 @@ cropsummed<-col_summing(crops)
 yieldsummed<-col_summing(allyield)
 compliantyieldsummed<-col_summing(compliantyield)
 noncompliantyieldsummed<-col_summing(noncompliantyield)
-forestlost<-col_summing(forestlost)
+forestlostsummed<-col_summing(forestlost)
 years<-c(2015, 2020, 2025, 2030, 2035, 2040, 2045, 2050)
-totals<-cbind(years, cocoasummed, compliantcocoasummed, noncompliantcocoasummed, cropsummed, forestsummed, yieldsummed, compliantyieldsummed, noncompliantyieldsummed)
+totals<-cbind(years, cocoasummed, compliantcocoasummed, noncompliantcocoasummed, cropsummed, forestsummed, forestlostsummed, yieldsummed, compliantyieldsummed, noncompliantyieldsummed)
 totals<-data.frame(totals)
 
 totals$rv<-randomval
@@ -156,7 +156,7 @@ if(ssg) { # in case we want to graph all randomized results per region yes/no
   export$crops_area<-cropslong$km2
   export$forest_area<-forestlong$km2
   export$forest_lost_area<-forestlostlong$km2
-  
+
   write.csv(export, paste0(outputdir, "/all_outputs_", runset, ".csv"))
 
     # ------- create plot
@@ -183,7 +183,7 @@ fp+geom_line(alpha=0.5)+
   theme(legend.position='none')+
   scale_colour_manual(values=c(rep("gray",99), "black"))+
   scale_size_manual(values=c(rep(0.5,99), 1.5))
-ggsave(paste(outputdir, "/forest_results_",runset,".png",sep=""), width=16, height=10)
+ggsave(paste(outputdir, "/area_forest_",runset,".png",sep=""), width=16, height=10)
 
 fp<-ggplot(data=aggset, aes(x=years+5, y=cocoasummed / (100*100), colour=rvf, size=rvf))
 fp+geom_line(alpha=0.5)+
@@ -193,7 +193,7 @@ fp+geom_line(alpha=0.5)+
   theme(legend.position='none')+
   scale_colour_manual(values=c(rep("gray",99), "black"))+
   scale_size_manual(values=c(rep(0.5,99), 1.5))
-ggsave(paste(outputdir, "/cocoa_results_",runset,".png",sep=""), width=16, height=10)
+ggsave(paste(outputdir, "/area_cocoa_all_",runset,".png",sep=""), width=16, height=10)
 
 fp<-ggplot(data=aggset, aes(x=years+5, y=compliantcocoasummed / (100*100), colour=rvf, size=rvf))
 fp+geom_line(alpha=0.5)+
@@ -203,7 +203,7 @@ fp+geom_line(alpha=0.5)+
   theme(legend.position='none')+
   scale_colour_manual(values=c(rep("gray",99), "black"))+
   scale_size_manual(values=c(rep(0.5,99), 1.5))
-ggsave(paste(outputdir, "/compliant_cocoa_results_",runset,".png",sep=""), width=16, height=10)   
+ggsave(paste(outputdir, "/area_cocoa__cc_",runset,".png",sep=""), width=16, height=10)   
 
 fp<-ggplot(data=aggset, aes(x=years+5, y=noncompliantcocoasummed / (100*100), colour=rvf, size=rvf))
 fp+geom_line(alpha=0.5)+
@@ -213,7 +213,7 @@ fp+geom_line(alpha=0.5)+
   theme(legend.position='none')+
   scale_colour_manual(values=c(rep("gray",99), "black"))+
   scale_size_manual(values=c(rep(0.5,99), 1.5))
-ggsave(paste(outputdir, "/noncompliant_cocoa_results_",runset,".png",sep=""), width=16, height=10)  
+ggsave(paste(outputdir, "/area_cocoa_nc_",runset,".png",sep=""), width=16, height=10)  
 
 fp<-ggplot(data=aggset, aes(x=years+5, y=cropsummed / (100*100), colour=rvf, size=rvf))
 fp+geom_line(alpha=0.5)+
@@ -223,37 +223,40 @@ fp+geom_line(alpha=0.5)+
   theme(legend.position='none')+
   scale_colour_manual(values=c(rep("gray",99), "black"))+
   scale_size_manual(values=c(rep(0.5,99), 1.5))
-ggsave(paste(outputdir, "/crops_results_",runset,".png",sep=""), width=16, height=10)
+ggsave(paste(outputdir, "/area_crops_",runset,".png",sep=""), width=16, height=10)
 
-fp<-ggplot(data=aggset, aes(x=years+5, y=yieldsummed / (cocoasummed), colour=rvf, size=rvf))
+fp<-ggplot(data=aggset, aes(x=years+5, y=yieldsummed * 10/ (cocoasummed), colour=rvf, size=rvf))
+# yield * 1000 (tonnes) / area * 100 (hectares) = 1000/100 = 10
 fp+geom_line(alpha=0.5)+
   xlab("Year") + ylab("Total cocoa yield per ha") + ggtitle(paste0(runset, " scenario"))+
-  coord_cartesian(ylim=c(0,1000))+
+  coord_cartesian(ylim=c(0,600))+
   theme_light() +
   theme(legend.position='none')+
   scale_colour_manual(values=c(rep("gray",99), "black"))+
   scale_size_manual(values=c(rep(0.5,99), 1.5))
-ggsave(paste(outputdir, "/yield_total_results_",runset,".png",sep=""), width=16, height=10)
+ggsave(paste(outputdir, "/yield_pha_all_",runset,".png",sep=""), width=16, height=10)
 
-fp<-ggplot(data=aggset, aes(x=years+5, y=compliantyieldsummed / (compliantcocoasummed), colour=rvf, size=rvf))
+fp<-ggplot(data=aggset, aes(x=years+5, y=compliantyieldsummed * 10 / (compliantcocoasummed), colour=rvf, size=rvf))
+# yield * 1000 (tonnes) / area * 100 (hectares) = 1000/100 = 10
 fp+geom_line(alpha=0.5)+
   xlab("Year") + ylab("Total compliant cocoa yield per ha") + ggtitle(paste0(runset, " scenario"))+
-  coord_cartesian(ylim=c(0,1000))+
+  coord_cartesian(ylim=c(0,600))+
   theme_light() +
   theme(legend.position='none')+
   scale_colour_manual(values=c(rep("gray",99), "black"))+
   scale_size_manual(values=c(rep(0.5,99), 1.5))
-ggsave(paste(outputdir, "/yield_compliant_results_",runset,".png",sep=""), width=16, height=10)
+ggsave(paste(outputdir, "/yield_pha_cc_",runset,".png",sep=""), width=16, height=10)
 
-fp<-ggplot(data=aggset, aes(x=years+5, y=noncompliantyieldsummed / (noncompliantcocoasummed), colour=rvf, size=rvf))
+fp<-ggplot(data=aggset, aes(x=years+5, y=noncompliantyieldsummed * 10 / (noncompliantcocoasummed), colour=rvf, size=rvf))
+# yield * 1000 (tonnes) / area * 100 (hectares) = 1000/100 = 10
 fp+geom_line(alpha=0.5)+
   xlab("Year") + ylab("Total noncompliant cocoa yield per ha") + ggtitle(paste0(runset, " scenario"))+
-  coord_cartesian(ylim=c(0,1000))+
+  coord_cartesian(ylim=c(0,600))+
   theme_light() +
   theme(legend.position='none')+
   scale_colour_manual(values=c(rep("gray",99), "black"))+
   scale_size_manual(values=c(rep(0.5,99), 1.5))
-ggsave(paste(outputdir, "/yield_noncompliant_results_",runset,".png",sep=""), width=16, height=10)
+ggsave(paste(outputdir, "/yield_pha_nc_",runset,".png",sep=""), width=16, height=10)
 
 fp<-ggplot(data=aggset, aes(x=years+5, y=yieldsummed / (1000 * 1000), colour=rvf, size=rvf))
 fp+geom_line(alpha=0.5)+
