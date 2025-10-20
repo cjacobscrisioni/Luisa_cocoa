@@ -794,7 +794,7 @@ container Africa_Cacao
 			
 			parameter<bool> store_cocoa_totals:= True, ExplicitSuppliers = 
 				"total_cocoa;total_compliant_cocoa;total_non_compliant_cocoa;
-					total_crops;total_mature_forest;
+					total_crops;total_mature_forest;transitions;
 					total_mature_forest;total_cocoa_in_protected_area;summed_forest_loss_by_cocoa;summed_othercrops_loss_by_cocoa;
 					summed_cocoa_yield;summed_compliant_cocoa_yield;summed_noncompliant_cocoa_yield";
 			
@@ -805,6 +805,7 @@ container Africa_Cacao
 				ModelType/transition_matrix, uint64), StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/transition_matrices.csv'", StorageType = "gdalwrite.vect" {
 					attribute<string> from (ModelType/transition_matrix):= ModelType/transition_matrix/from;
 					attribute<string> to (ModelType/transition_matrix):= ModelType/transition_matrix/to;
+					attribute<uint32> initial (ModelType/transition_matrix):= pcount(all_landuse_results/y2015)[ModelType/transition_matrix/first_rel];
 				}
 			container matureforest_lost:= for_each_nedv(MetaData/Periods/sYear, id(MetaData/Periods) > 0[MetaData/Periods] ? 
 				'uint32((all_landuse_results/'+MetaData/Periods/sYear+' <> Classifications/ModelType/ParamConstants/YoungForest && all_landuse_results/'+MetaData/Periods/sYear+' <> Classifications/ModelType/ParamConstants/MatureForest) && all_landuse_results/'+MetaData/Periods/sYear[sub_or_null(id(MetaData/Periods), 1)]+' = Classifications/ModelType/ParamConstants/MatureForest)' :
