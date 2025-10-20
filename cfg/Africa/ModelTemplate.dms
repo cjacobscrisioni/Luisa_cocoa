@@ -70,10 +70,12 @@ container ModelIterationSchemes {
 					'max_elem(sum(PrevState/hectares/'+Classifications/ActiveCocoaTypes/Label+' - cocoa_loss/'+Classifications/ActiveCocoaTypes/Label+')[km2], 0[km2]) 
 						+ cocoa_add_km2_needed/'+Classifications/ActiveCocoaTypes/Label, void, km2);
 				
+				parameter<float32> years_since_start:= float32(MetaData/Periods/Year[PeriodId]) - float32(MetaData/Periods/Year[0[MetaData/Periods]]);
+				
 				container max_addition:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
 					Classifications/ActiveCocoaTypes/Label = 'Rehabilitated_Cocoa' ? 
 					'Cocoa[uint32]' :
-					'(sum(float32(InitialState/LandUse = ModelType/ParamConstants/'+Classifications/ActiveCocoaTypes/Label+')) * (1f + ((float32(MetaData/Periods/Year[PeriodId]) - float32(MetaData/Periods/Year[0[MetaData/Periods]])) * RunSettings/Cocoa_Scenarios/Cocoa_growth_annual_max[RunSettings/Scenarios/second_rel[RunSettings/ScenarioId]])))[uint32]',
+					'(sum(float32(InitialState/LandUse = ModelType/ParamConstants/'+Classifications/ActiveCocoaTypes/Label+')) * ((1f + (RunSettings/Cocoa_Scenarios/Cocoa_growth_annual_max[RunSettings/Scenarios/second_rel[RunSettings/ScenarioId]]))^years_since_start))[uint32]',
 					void, uint32);
 				
 				//parameter<uint32> max_add_cocoa:= (sum(float32(InitialState/LandUse = ModelType/ParamConstants/Cocoa)) + ((float32(MetaData/Periods/Year[PeriodId]) - float32(MetaData/Periods/Year[0[MetaData/Periods]])) * RunSettings/Cocoa_Scenarios/Cocoa_growth_annual_max[RunSettings/Scenarios/second_rel[RunSettings/ScenarioId]]))[uint32]; 
