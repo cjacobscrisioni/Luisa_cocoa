@@ -114,7 +114,8 @@ container Classifications: using = "Units;"
 		attribute<bool>				isActiveCocoa:  expr = "id(.) = ParamConstants/Cocoa || id(.) = ParamConstants/Rehabilitated_Cocoa || id(.) = ParamConstants/NonCompliant_Cocoa";
 		
 		// yieldfactors set to the estimated differences between compliant (cocoa + Rehabilitated_Cocoa) and non-compliant (NonCompliant_Cocoa), offered by Ole Boysen on 14/7/25 (
-		attribute<float32> 			YieldFactor:= switch(case(id(.)=ParamConstants/Cocoa, 1.28f), case(id(.)=ParamConstants/Rehabilitated_Cocoa, 1.28f), case(id(.)=ParamConstants/NonCompliant_Cocoa, 1.0f), 0f);
+		attribute<float32> 			YieldFactor:= switch(case(id(.)=ParamConstants/Cocoa, 1.28f), case(id(.)=ParamConstants/Rehabilitated_Cocoa, 1.28f), case(id(.)=ParamConstants/NonCompliant_Cocoa, 1.0f), 0f)
+		, descr = "Yield of km2 of land, compared to noncompliant cocoa, according to data from Folefack (2021)"		;
 		
 		container ParamConstants: 	expr = "for_each_nedv(Name, 'uint8('+ string(id(.)) +')', void, uint8)";
 		unit<uint32> mt32:			expr = "range(uint32, 0, #ActiveModelTypes)" {

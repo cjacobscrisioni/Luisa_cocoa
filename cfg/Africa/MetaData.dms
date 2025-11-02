@@ -252,7 +252,7 @@ Container MetaData: Using = "Classifications;"
 //			'sqr_cocoa_climate_suit'	,'sqr(float32(LoadSpatialData/cocoa_climate_suit_2016/inFile/ReadData))'			 									,'float32',
 			'log_slope'					,'log(max_elem(float32(LoadSpatialData/slope/inFile/ReadData), 0.01f))'														,'float32', 
 			'log_rough'					,'log(max_elem(float32(LoadSpatialData/roughness/inFile/ReadData), 0.01f))'													,'float32',
-			'protected_areas'			,'float32(IsDefined(LoadSpatialData/CIV_Ghana_ProtAreas_IUCN/RasterIds))'													,'float32'
+			'protected_areas'			,'float32(IsDefined(LoadSpatialData/Ghana_ProtAreas_Renier/RasterIds))'													,'float32'
 			];
 		}
 		attribute<string> Name   := inTable/Elements[((id(.)*NrAttributes)+0)[inTable]];
@@ -346,7 +346,7 @@ Container MetaData: Using = "Classifications;"
 		
 		parameter<uint32> NrAttributes: expr = "4";
 	}
-	unit<uint32> SpatialDataToLoad: NrOfRows = 31
+	unit<uint32> SpatialDataToLoad: NrOfRows = 32
 	{
 		
 		unit<uint32> inTable: expr = "range(uint32, 0, #SpatialDataToLoad * NrAttributes)"
@@ -378,6 +378,7 @@ Container MetaData: Using = "Classifications;"
 			'ghsl_uc',					'poly',      '%AfricaSourceDataDir%/urbancentres/GHS_STAT_UCDB2015MT_GLOBE_R2019A_V1_0_Africa_epsg102022','shp',
 			'CIV_ETH_Cocoa_areas',      'poly',  '%AfricaSourceDataDir%/agriculture/cacao/CIV_ETH_Cocoa_areas_AEA','gpkg',
 			'CIV_Ghana_ProtAreas_IUCN', 'poly',  '%AfricaSourceDataDir%/agriculture/cacao/CIV_Ghana_ProtAreas_IUCN_AEA','gpkg',
+			'Ghana_ProtAreas_Renier', 'poly',  '%AfricaSourceDataDir%/agriculture/cacao/GHA_ProtAreas_Renier2025','shp',
 			'CIV_Ghana_WaterBod',       'poly',  '%AfricaSourceDataDir%/agriculture/cacao/CIV_Ghana_WaterBod_AEA','gpkg',
 			'CIV_Regions_admin1',       'poly',  '%AfricaSourceDataDir%/agriculture/cacao/CIV_Regions_admin1_AEA','gpkg',
 			// 'cocoa_climate_suit_2016',  'float32tiff','%AfricaSourceDataDir%/agriculture/cacao/cocoa_climate_suit_2016','tif',
