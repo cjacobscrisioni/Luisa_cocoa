@@ -28,7 +28,7 @@ container Africa_Cacao
 {
 	container RunSettings 
 	{
-		parameter<Scenarios> ScenarioId            	:= 4[Scenarios]; //4[Scenarios] = BAU SSP2, 5[Scenarios] = EUDR_0
+		parameter<Scenarios> ScenarioId            	:= 3[Scenarios]; //4[Scenarios] = BAU SSP2, 5[Scenarios] = EUDR_0
 		parameter<string> 	 ScenarioName			:= Scenarios/LabelText[ScenarioId];
 		parameter<bool>		 ForestProtection		:= Cocoa_Scenarios/ForestProtection[Scenarios/second_rel[ScenarioId]];
 		parameter<string>    SSP_ScenarioName       := SSP_Scenarios/SocioEconomicAssumptions[Scenarios/first_rel[ScenarioId]];
@@ -805,7 +805,7 @@ container Africa_Cacao
 				ModelType/transition_matrix, uint64), StorageName = "='%LocalDataProjDir%/'+name+'/'+RunSettings/ScenarioName+'/'+MetaData/TC_random/label[RandomId]+'/transition_matrices.csv'", StorageType = "gdalwrite.vect" {
 					attribute<string> from (ModelType/transition_matrix):= ModelType/transition_matrix/from;
 					attribute<string> to (ModelType/transition_matrix):= ModelType/transition_matrix/to;
-					attribute<uint32> initial (ModelType/transition_matrix):= pcount(all_landuse_results/y2015)[ModelType/transition_matrix/first_rel];
+					attribute<uint64> initial (ModelType/transition_matrix):= pcount(all_landuse_results/y2015)[ModelType/transition_matrix/first_rel];
 				}
 			container matureforest_lost:= for_each_nedv(MetaData/Periods/sYear, id(MetaData/Periods) > 0[MetaData/Periods] ? 
 				'uint32((all_landuse_results/'+MetaData/Periods/sYear+' <> Classifications/ModelType/ParamConstants/YoungForest && all_landuse_results/'+MetaData/Periods/sYear+' <> Classifications/ModelType/ParamConstants/MatureForest) && all_landuse_results/'+MetaData/Periods/sYear[sub_or_null(id(MetaData/Periods), 1)]+' = Classifications/ModelType/ParamConstants/MatureForest)' :

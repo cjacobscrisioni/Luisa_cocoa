@@ -5,6 +5,8 @@ library(tidyr)
 drive<-"F:/"
 
 ssg<-TRUE #FALSE # store subgraphs of all randomized variants yes/no
+RandomVersions<-"Reference"
+#RandomVersions<-c("Reference", paste0('Random_', 1:99))
 
 #runset<-"SSP2_Cocoa_uncons_bau"
 runset<-"SSP2_Cocoa_cons_bau"
@@ -14,8 +16,7 @@ runset<-"SSP2_Cocoa_cons_bau"
 setwd(paste0(drive,"LocalData/luisa_cocoa/GHA/",runset))
 #getwd()
 
-RandomVersions<-"Reference"
-#RandomVersions<-c("Reference", paste0('Random_', 1:99))
+
 
 counter<-0
 
