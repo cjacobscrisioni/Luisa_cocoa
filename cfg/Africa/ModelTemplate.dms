@@ -63,7 +63,7 @@ container ModelIterationSchemes {
 					//'sum(float32(PrevState/LandUse == '+string(Classifications/ActiveCocoaTypes/Nr_OrgEntity)+'[ModelType] || cocoa_shifts/'+Classifications/ActiveCocoaTypes/Label+')) 
 					'max_elem(sum('+
 						//'(max_elem(PrevState/hectares/'+Classifications/ActiveCocoaTypes/Label+' - cocoa_loss/'+Classifications/ActiveCocoaTypes/Label+', 0[ha])) +'+
-						'(add_output_needed/'+Classifications/ActiveCocoaTypes/Label+'[kg] / (PrevState/avg_cocoa_suit/'+Classifications/ActiveCocoaTypes/Label+' * Classifications/cocoa_tree_age/npv_yield[14[Classifications/cocoa_tree_age]])))[km2], 0[km2])'
+						'(add_output_needed/'+Classifications/ActiveCocoaTypes/Label+'[kg] / (PrevState/avg_cocoa_suit/'+Classifications/ActiveCocoaTypes/Label+' * Classifications/cocoa_tree_age/yield[14[Classifications/cocoa_tree_age]])))[km2], 0[km2])'
 						, void, float32) {parameter<km2> all:= ='add('+asitemlist(Classifications/ActiveCocoaTypes/Label)+')';}
 				
 				container cocoa_km_min_needed:= for_each_nedv(Classifications/ActiveCocoaTypes/Label, 
@@ -123,7 +123,7 @@ container ModelIterationSchemes {
 						case(RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] && RunSettings/Scenarios/MaintainYields[RunSettings/ScenarioId], const(MakeDefined(min_elem(cocoa_km_min_needed/NonCompliant_Cocoa[uint32], max_addition/NonCompliant_Cocoa), 0),ClaimRegions/Countries, uint32))
 						, case(RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] && !RunSettings/Scenarios/MaintainYields[RunSettings/ScenarioId], const(0,ClaimRegions/Countries,uint32))
 						, const(0,ClaimRegions/Countries,uint32))";
-					attribute<uint32>  	Exhausted_Cocoa   (CropsProjectionZones):  expr = "sum(uint32(context/DynamicGridFactors/cocoa_exhausted), ModelClaimRasters/Exhausted_Cocoa)";
+					attribute<uint32>  	Exhausted_Cocoa   (CropsProjectionZones):  		expr = "sum(uint32(context/DynamicGridFactors/cocoa_exhausted), ModelClaimRasters/Exhausted_Cocoa)";
 				}
 				container max: expr = "for_each_nedv(isNull(ModelType/ModelClaimDef) ? ModelType/Name : '', 'const(uint32(#domain),ClaimRegions/Countries,uint32)', ClaimRegions/Countries, uint32)" {
 					//attribute<uint32> 	Crops 			(CropsProjectionZones): 	expr = "!RunSettings/Scenarios/Unconstrained[RunSettings/ScenarioId] ? (111 * cCrops) / 100 : 99999";
@@ -136,7 +136,7 @@ container ModelIterationSchemes {
 //					attribute<uint32>	YoungForest		(ForestProjectionZones):	expr = "uint32(round(sum(float32(PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/YoungForest), ModelClaimRasters/YoungForest) + cYoungForest))";
 //					attribute<uint32>	MatureForest	(ForestProjectionZones):	expr = "sum(uint32(PrevState/LandUse = Classifications/ActiveModelTypes/ParamConstants/MatureForest), ModelClaimRasters/MatureForest)";
 					attribute<uint32>	NonCompliant_Cocoa (ClaimRegions/Countries):  	expr = "const(max_addition/NonCompliant_Cocoa,ClaimRegions/Countries,uint32)";
-					attribute<uint32>  	Exhausted_Cocoa   (CropsProjectionZones):  		expr = "sum(uint32(context/DynamicGridFactors/cocoa_exhausted), ModelClaimRasters/Exhausted_Cocoa)";
+					attribute<uint32>  	Exhausted_Cocoa   (CropsProjectionZones):  expr = "sum(uint32(context/DynamicGridFactors/cocoa_exhausted), ModelClaimRasters/Exhausted_Cocoa) + sum(uint32(PrevState/LandUse = ModelType/ParamConstants/Exhausted_Cocoa), ModelClaimRasters/Exhausted_Cocoa)";
 				}
 			}
 			container TransitionCosts:			expr = "for_each_nedv(ModelType/name, 'float32(rjoin(point(uint32(PrevState/LandUse[domain/grid_rel]), const((1000 * RandomId) + '+string(id(ModelType))+',domain, uint32), upoint), ModellingRules/TransitionCosts/Random/unipt, ModellingRules/TransitionCosts/Random/Cost))', domain, float32)";

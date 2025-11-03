@@ -227,7 +227,7 @@ container Classifications: using = "Units;"
 				Extrapolated for older age classes using a power function for older age classes, which has been estimated on the 10-30 year old age classes and takes the form s= 1366.4x^-1.035"; 
 		attribute<float32>	rel_cumu_break:= cumu_break / max(cumu_break), Descr = "Cumulative breaks rescaled to 0-1 values";
 		
-		parameter<string> yieldcurve_eq3:= 'exp(1.6399f - (0.18f * age[float32]) + (2.924f * log(age[float32] + 0.01f)))[yield_ha]'; // yield curve reschaled to zero to one value
+		parameter<string> yieldcurve_eq3:= 'exp(1.6399f - (0.18f * age[float32]) + (2.924f * log(age[float32] + 0.01f)))[yield_ha]'; // yield curve rescaled to zero to one value
 		
 	}
 	unit<uint32> cocoa_tree_age: nrofrows = 100 {
