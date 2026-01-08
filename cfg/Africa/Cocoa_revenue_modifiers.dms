@@ -3,7 +3,7 @@ container cocoa_revenue_modifiers {
 	
 	unit<uint8> scenario_revenues:= Classifications/ActiveModelTypes {
 		attribute<scenario_revenue_subset> rev_rel:= invert(scenario_revenue_subset/Landuse_rel);
-		attribute<float32> 	revfactor:= 1f+makedefined(scenario_revenue_subset/infactor[rev_rel] / 100f, 0f);
+		attribute<float32> 	revfactor:= makedefined(scenario_revenue_subset/infactor[rev_rel], 1f);
 	}
 	
 	unit<uint32> scenario_revenue_subset:= subset(revenue_inputs/Scenario_rel == /RunSettings/Scenarios/second_rel[RunSettings/Scenarioid]) {
@@ -13,7 +13,7 @@ container cocoa_revenue_modifiers {
 	
 	
 	
-	unit<uint32> revenue_inputs: nrofrows = 8 {
+	unit<uint32> revenue_inputs: nrofrows = 16 {
 		
 		//
 		
@@ -28,14 +28,22 @@ container cocoa_revenue_modifiers {
 		unit<uint32> inMatrix:= range(uint32, 0, #revenue_inputs*3) {
 			
 			attribute<string> line: [
-				'Crops', 				'EUDR_0', '0.33464201',
-				'NonCompliant_Cocoa', 	'EUDR_0', '8.85902963',
-				'Cocoa', 				'EUDR_0', '27.2287032',
-				'Rehabilitated_Cocoa', 		'EUDR_0', '27.2287032',
-				'Crops', 				'EUDR_0_cons', '0.33464201',
-				'NonCompliant_Cocoa', 	'EUDR_0_cons', '8.85902963',
-				'Cocoa', 				'EUDR_0_cons', '27.2287032',
-				'Rehabilitated_Cocoa', 	'EUDR_0_cons', '27.2287032'
+				'Crops', 				'EUDR_0', '1.0033464201',
+				'NonCompliant_Cocoa', 	'EUDR_0', '1.0885902963',
+				'Cocoa', 				'EUDR_0', '1.272287032',
+				'Rehabilitated_Cocoa', 	'EUDR_0', '1.272287032',
+				'Crops', 				'EUDR_0_cons', '1.0033464201',
+				'NonCompliant_Cocoa', 	'EUDR_0_cons', '1.0885902963',
+				'Cocoa', 				'EUDR_0_cons', '1.272287032',
+				'Rehabilitated_Cocoa', 	'EUDR_0_cons', '1.272287032',
+				'Crops', 				'EUDR_0_cons_no_nc', '1.0033464201',
+				'NonCompliant_Cocoa', 	'EUDR_0_cons_no_nc', '0.00',
+				'Cocoa', 				'EUDR_0_cons_no_nc', '1.272287032',
+				'Rehabilitated_Cocoa', 	'EUDR_0_cons_no_nc', '1.272287032',
+				'Crops', 				'BAU_cons_protected_no_nc', '1.0',
+				'NonCompliant_Cocoa', 	'BAU_cons_protected_no_nc', '0.00',
+				'Cocoa', 				'BAU_cons_protected_no_nc', '1.0',
+				'Rehabilitated_Cocoa', 	'BAU_cons_protected_no_nc', '1.0'
 		];
 		}
 	}

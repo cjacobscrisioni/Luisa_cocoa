@@ -28,8 +28,10 @@ container Africa_Cacao
 {
 	container RunSettings 
 	{
-		parameter<Scenarios> ScenarioId            	:= 5[Scenarios]; //4[Scenarios] = BAU SSP2, 5[Scenarios] = EUDR_0
-		parameter<string> 	 ScenarioName			:= Scenarios/LabelText[ScenarioId];
+		parameter<string>    ScenarioName:= replace_value(expand(., '%env:ScenarioName%'), 'env:ScenarioName', ScenarioName_manually), Descr = "This parameter extracts the scenarioname setting if the model is run from a batch file, if not, the ScenarioName_manually paramater setting is used."; 
+		
+		parameter<Scenarios> ScenarioId            	:= rlookup(ScenarioName, Scenarios/LabelText); 
+		parameter<string> 	 ScenarioName_manually	:= 'SSP2_Cocoa_cons_BAU_protected';
 		parameter<bool>		 ForestProtection		:= Cocoa_Scenarios/ForestProtection[Scenarios/second_rel[ScenarioId]];
 		parameter<string>    SSP_ScenarioName       := SSP_Scenarios/SocioEconomicAssumptions[Scenarios/first_rel[ScenarioId]];
 		parameter<string> 	 Cocoa_ScenarioName		:= Cocoa_Scenarios/LabelText[Scenarios/second_rel[ScenarioId]];
@@ -59,10 +61,10 @@ container Africa_Cacao
 			attribute<string> SocioEconomicAssumptions : ['SSP2'];
 			attribute<string> LabelText                := SocioEconomicAssumptions, DialogType = "LabelText";
 		}
-		unit<uint32> Cocoa_Scenarios: NrOfRows = 6 {
-			attribute<string> LabelText: ['Cocoa_static', 'Cocoa_uncons_bau', 'EUDR_0', 'Cocoa_cons_BAU', 'EUDR_0_cons', 'Cocoa_cons_BAU_protected'];
-			attribute<string> AgricClaim: ['Agric_static', 'Agric_LID', 'Agric_LID', 'Agric_LID', 'Agric_LID', 'Agric_LID'];
-			attribute<bool>	  ForestProtection:= id(.) = 2 || id(.) = 4 || id(.) = 5;
+		unit<uint32> Cocoa_Scenarios: NrOfRows = 8 {
+			attribute<string> LabelText: ['Cocoa_static', 'Cocoa_uncons_bau', 'EUDR_0', 'Cocoa_cons_BAU', 'EUDR_0_cons', 'Cocoa_cons_BAU_protected', 'EUDR_0_cons_no_nc', 'BAU_cons_protected_no_nc'];
+			attribute<string> AgricClaim: ['Agric_static', 'Agric_LID', 'Agric_LID', 'Agric_LID', 'Agric_LID', 'Agric_LID', 'Agric_LID', 'Agric_LID'];
+			attribute<bool>	  ForestProtection:= id(.) = 2 || id(.) = 4 || id(.) = 5 || id(.) = 6 || id(.) = 7 ;
 			attribute<bool>   Unconstrained:= const(TRUE,.,bool);
 			attribute<bool>   MaintainYields:= id(.) = 0 || id(.) > 2; // selects scenarios in which future yields are aggregated and maintained at the regional level. Problematic in case of forest protection.
 			attribute<bool>   RevenueModification:= pcount(cocoa_revenue_modifiers/revenue_inputs/Scenario_rel) > 0;

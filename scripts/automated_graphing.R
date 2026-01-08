@@ -4,15 +4,17 @@ library(tidyr)
 
 drive<-"F:/"
 
-ssg<-TRUE #FALSE # store subgraphs of all randomized variants yes/no
-RandomVersions<-"Reference"
-#RandomVersions<-c("Reference", paste0('Random_', 1:99))
+ssg<-FALSE #FALSE # store subgraphs of all randomized variants yes/no
+#RandomVersions<-"Reference"
+RandomVersions<-c("Reference", paste0('Random_', 1:99))
 
-#runset<-"SSP2_Cocoa_uncons_bau"
-#runset<-"SSP2_EUDR_0"
-#runset<-"SSP2_Cocoa_cons_bau"
+  #runset<-"SSP2_Cocoa_uncons_bau"
+  #runset<-"SSP2_EUDR_0"
+runset<-"SSP2_Cocoa_cons_bau"
 #runset<-"SSP2_EUDR_0_cons"
-runset<-"SSP2_Cocoa_cons_BAU_protected"
+#runset<-"SSP2_Cocoa_cons_BAU_protected"
+#runset<-"SSP2_BAU_cons_protected_no_nc"
+#runset<-"SSP2_EUDR_0_cons_no_nc"
 
 setwd(paste0(drive,"LocalData/luisa_cocoa/GHA/",runset))
 #getwd()
